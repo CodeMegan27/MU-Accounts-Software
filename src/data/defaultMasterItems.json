@@ -1,0 +1,626 @@
+[
+  {
+    "id": "ITEM_001",
+    "name": "NORMAL FLEX",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 60,
+    "usageCount": 640
+  },
+  {
+    "id": "ITEM_002",
+    "name": "PHOTO FRAME",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 300,
+    "usageCount": 357
+  },
+  {
+    "id": "ITEM_003",
+    "name": "STAR FLEX",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 60,
+    "usageCount": 357
+  },
+  {
+    "id": "ITEM_004",
+    "name": "INVITATION - FANCY CARD",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 18,
+    "usageCount": 119
+  },
+  {
+    "id": "ITEM_005",
+    "name": "DISPLAY BOARD",
+    "category": "BOARDS & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 60,
+    "usageCount": 92
+  },
+  {
+    "id": "ITEM_006",
+    "name": "GENERAL STICKER / LABEL",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 60,
+    "usageCount": 84
+  },
+  {
+    "id": "ITEM_007",
+    "name": "ORDINARY NYLON RUBBER STAMP",
+    "category": "OFFICE STATIONERY",
+    "uqc": "NOS",
+    "defaultRate": 120,
+    "usageCount": 80
+  },
+  {
+    "id": "ITEM_008",
+    "name": "STICKER SHEET WITH HALF CUT / SCORING (A3)",
+    "category": "PRINT & PACK",
+    "uqc": "SHT",
+    "defaultRate": 60,
+    "usageCount": 74
+  },
+  {
+    "id": "ITEM_009",
+    "name": "BILL BOOK (A4)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 52
+  },
+  {
+    "id": "ITEM_010",
+    "name": "INVITATION - A4 300GSM BOARD (GLOSSY LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 35,
+    "usageCount": 50
+  },
+  {
+    "id": "ITEM_011",
+    "name": "INVITATION - FOIL STAMPED CARD",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 5,
+    "usageCount": 34
+  },
+  {
+    "id": "ITEM_012",
+    "name": "VISITING CARD - MATT (DOUBLE SIDE)",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 32
+  },
+  {
+    "id": "ITEM_013",
+    "name": "INVITATION - LOAN / PUBERTY CARD",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 50,
+    "usageCount": 28
+  },
+  {
+    "id": "ITEM_014",
+    "name": "NOTICE (A4)",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 1,
+    "usageCount": 28
+  },
+  {
+    "id": "ITEM_015",
+    "name": "OFFICE ENVELOPE / COVER",
+    "category": "OFFICE STATIONERY",
+    "uqc": "NOS",
+    "defaultRate": 3,
+    "usageCount": 27
+  },
+  {
+    "id": "ITEM_016",
+    "name": "SELF INK AUTOMATIC STAMP",
+    "category": "OFFICE STATIONERY",
+    "uqc": "NOS",
+    "defaultRate": 500,
+    "usageCount": 22
+  },
+  {
+    "id": "ITEM_017",
+    "name": "FOAM BOARD (SUNBOARD)",
+    "category": "BOARDS & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 480,
+    "usageCount": 21
+  },
+  {
+    "id": "ITEM_018",
+    "name": "VINYL STICKER MEDIA",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 0,
+    "usageCount": 16
+  },
+  {
+    "id": "ITEM_019",
+    "name": "VISITING CARD - GLOSSY (DOUBLE SIDE)",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 16
+  },
+  {
+    "id": "ITEM_020",
+    "name": "VISITING CARD - MATT (SINGLE SIDE)",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 15
+  },
+  {
+    "id": "ITEM_021",
+    "name": "INVITATION - A4 300GSM BOARD (MATT LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 14
+  },
+  {
+    "id": "ITEM_022",
+    "name": "INVITATION - 19X7 300GSM BOARD (GLOSSY LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 13
+  },
+  {
+    "id": "ITEM_023",
+    "name": "INVITATION - A3 300GSM BOARD (GLOSSY LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 12
+  },
+  {
+    "id": "ITEM_024",
+    "name": "DONATION BOOK (A4/2)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 11
+  },
+  {
+    "id": "ITEM_025",
+    "name": "VISITING CARD - GLOSSY (SINGLE SIDE)",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 11
+  },
+  {
+    "id": "ITEM_026",
+    "name": "FLYER (A4)",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 2,
+    "usageCount": 11
+  },
+  {
+    "id": "ITEM_027",
+    "name": "WALL POSTER",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 17,
+    "usageCount": 10
+  },
+  {
+    "id": "ITEM_028",
+    "name": "PVC WATERPROOF STICKER",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 10
+  },
+  {
+    "id": "ITEM_029",
+    "name": "BILL BOOK",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 280,
+    "usageCount": 10
+  },
+  {
+    "id": "ITEM_030",
+    "name": "PHOTO FRAME (A4)",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 300,
+    "usageCount": 10
+  },
+  {
+    "id": "ITEM_031",
+    "name": "MINIDOOR",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 0,
+    "usageCount": 9
+  },
+  {
+    "id": "ITEM_032",
+    "name": "ROSTER SPONSOR BNI",
+    "category": "ADVERTISEMENT",
+    "uqc": "NOS",
+    "defaultRate": 1800,
+    "usageCount": 9
+  },
+  {
+    "id": "ITEM_033",
+    "name": "PHOTO FRAME - CLAMP",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 225,
+    "usageCount": 8
+  },
+  {
+    "id": "ITEM_034",
+    "name": "LETTER PAD",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 1,
+    "usageCount": 8
+  },
+  {
+    "id": "ITEM_035",
+    "name": "NOTICE (A5)",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 1,
+    "usageCount": 8
+  },
+  {
+    "id": "ITEM_036",
+    "name": "B2B BOND PAPER (75 GSM)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 1,
+    "usageCount": 7
+  },
+  {
+    "id": "ITEM_037",
+    "name": "BAG",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 16,
+    "usageCount": 7
+  },
+  {
+    "id": "ITEM_038",
+    "name": "PRINTED COVER (A5)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "NOS",
+    "defaultRate": 3,
+    "usageCount": 7
+  },
+  {
+    "id": "ITEM_039",
+    "name": "INVITATION - UV PRINT",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 10,
+    "usageCount": 6
+  },
+  {
+    "id": "ITEM_040",
+    "name": "B2B BOND PAPER (75 GSM) (A4)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 1,
+    "usageCount": 6
+  },
+  {
+    "id": "ITEM_041",
+    "name": "INVITATION - A5 300GSM BOARD (GLOSSY LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 6
+  },
+  {
+    "id": "ITEM_042",
+    "name": "UV BACKLIGHT FLEX",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 0,
+    "usageCount": 6
+  },
+  {
+    "id": "ITEM_043",
+    "name": "INVITATION - A3 300GSM BOARD (MATT LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_044",
+    "name": "NOTICE",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 2,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_045",
+    "name": "INVITATION - 19X7 300GSM BOARD (MATT LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_046",
+    "name": "PHOTO FRAME (12X8)",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 700,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_047",
+    "name": "BIT",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 50,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_048",
+    "name": "PHOTO FRAME - PHOTO FRAME",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 1000,
+    "usageCount": 5
+  },
+  {
+    "id": "ITEM_049",
+    "name": "PHOTO FRAME (10X8)",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 200,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_050",
+    "name": "PHOTO FRAME (12X18)",
+    "category": "FRAMES & GIFTS",
+    "uqc": "NOS",
+    "defaultRate": 1100,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_051",
+    "name": "LOGO",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 3000,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_052",
+    "name": "LADDER",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 50,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_053",
+    "name": "ART PAPER (130-170 GSM)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 0,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_054",
+    "name": "BILL BOOK (A5)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 4
+  },
+  {
+    "id": "ITEM_055",
+    "name": "INVITATION - STICKER",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 1,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_056",
+    "name": "MENU CARD WITH LAMINATION",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_057",
+    "name": "CHIRPOOR",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 1,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_058",
+    "name": "CHART",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 3,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_059",
+    "name": "INVITATION - FRIENDS CARD",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 12,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_060",
+    "name": "MENU CARD",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 3,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_061",
+    "name": "CERTIFICATE",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 30,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_062",
+    "name": "VISITING CARD - DS VISITING CARD",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_063",
+    "name": "NOTICE (A3)",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 3,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_064",
+    "name": "BILL BOOK (A4/2)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 3
+  },
+  {
+    "id": "ITEM_065",
+    "name": "A4 INDEX PAPER (A4)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 2,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_066",
+    "name": "DONATION BOOK (A4)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_067",
+    "name": "D-CUT BAG",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 15,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_068",
+    "name": "VISITING CARD - VISITING CARD",
+    "category": "INVITATION & CARDS",
+    "uqc": "PAC",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_069",
+    "name": "SYNTHETIC SHEET MENU CARD (A4)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 290,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_070",
+    "name": "VOUCHER",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_071",
+    "name": "A4 100GSM BOND PAPER (A4)",
+    "category": "RAW MATERIALS & PAPER",
+    "uqc": "RIM",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_072",
+    "name": "LAMINATION",
+    "category": "PRINT & PACK",
+    "uqc": "NOS",
+    "defaultRate": 40,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_073",
+    "name": "KAMBU",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_074",
+    "name": "INVITATION - A5 300GSM BOARD (MATT LAM)",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_075",
+    "name": "INVITATION - BUTTERFLY CARD",
+    "category": "INVITATION",
+    "uqc": "NOS",
+    "defaultRate": 5,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_076",
+    "name": "BILL BOOK (LEGAL)",
+    "category": "OFFICE STATIONERY",
+    "uqc": "BOK",
+    "defaultRate": 0,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_077",
+    "name": "PASTE",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 50,
+    "usageCount": 2
+  },
+  {
+    "id": "ITEM_078",
+    "name": "UV REFLECTIVE STICKER",
+    "category": "ADVERTISEMENT & SIGNAGE",
+    "uqc": "SQFT",
+    "defaultRate": 0,
+    "usageCount": 2
+  }
+]

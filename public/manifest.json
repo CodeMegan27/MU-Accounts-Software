@@ -1,0 +1,18 @@
+{
+  "short_name": "RSPurchase",
+  "name": "RSPurchase Enterprise",
+  "description": "Enterprise Purchase Register, Vendor Ledgers & GST Accounting",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "orientation": "any"
+}
