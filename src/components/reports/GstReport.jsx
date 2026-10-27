@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
@@ -22,12 +21,7 @@ import {
   Building2, 
   CreditCard,
   Layers,
-  ArrowRight,
-  FileCode,
-  Mail,
-  Send,
-  Lock,
-  Crown
+  ArrowRight
 } from 'lucide-react';
 
 // Helper to extract YYYY-MM safely from diverse date strings
@@ -54,7 +48,6 @@ function getYearMonth(dateStr) {
 
 export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
   const { bills, sales, assets = [] } = useData();
-  const { currentTier, tierConfig, isDeveloper } = useAuth();
   const { showToast } = useToast();
 
   // Active sub-report: 'gstr1' | 'gstr2b' | 'gstr3b'
@@ -576,262 +569,6 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
     showToast('GSTR-3B Monthly Return Excel exported!', 'success');
   };
 
-  // --- OFFICIAL GSTN OFFLINE UTILITY JSON PAYLOAD GENERATION ---
-
-  const formatFp = (ym) => {
-    if (!ym) return '092026';
-    const parts = ym.split('-');
-    if (parts.length === 2) {
-      return `${parts[1].padStart(2, '0')}${parts[0]}`;
-    }
-    return '092026';
-  };
-
-  const formatDdmmyyyy = (dateStr) => {
-    if (!dateStr) return '01-09-2026';
-    try {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        return `${dd}-${mm}-${yyyy}`;
-      }
-    } catch (e) {}
-    return String(dateStr);
-  };
-
-  const downloadJSON = (data, filename) => {
-    const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-    const link = document.createElement('a');
-    link.setAttribute("href", jsonStr);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
-  // Export GSTR-1 in Official GSTN Offline Utility JSON Schema
-  const handleExportGstr1JSON = () => {
-    if (filteredGstr1.length === 0) {
-      showToast('No GSTR-1 sales records found for this period', 'error');
-      return;
-    }
-
-    // 1. Group B2B by Recipient GSTIN
-    const b2bMap = {};
-    filteredGstr1.filter(s => s.isB2B).forEach(s => {
-      const ctin = (s.gstin || '33URP0000000000').toUpperCase().trim();
-      if (!b2bMap[ctin]) {
-        b2bMap[ctin] = [];
-      }
-      b2bMap[ctin].push({
-        inum: s.invoiceNo || 'INV-001',
-        idt: formatDdmmyyyy(s.date),
-        val: Number((s.finalAmount || 0).toFixed(2)),
-        pos: s.isInterState ? "99" : "33",
-        rchrg: "N",
-        inv_typ: "R",
-        itms: [
-          {
-            num: 1,
-            itm_det: {
-              txval: Number((s.taxableAmount || 0).toFixed(2)),
-              rt: Number(s.gstRate || 18),
-              camt: Number((s.cgst || 0).toFixed(2)),
-              samt: Number((s.sgst || 0).toFixed(2)),
-              csamt: 0
-            }
-          }
-        ]
-      });
-    });
-
-    const b2b = Object.keys(b2bMap).map(ctin => ({
-      ctin,
-      inv: b2bMap[ctin]
-    }));
-
-    // 2. Group B2C (Small / Retail) by Rate and POS
-    const b2csMap = {};
-    filteredGstr1.filter(s => !s.isB2B).forEach(s => {
-      const rt = Number(s.gstRate || 18);
-      const pos = s.isInterState ? "99" : "33";
-      const key = `${pos}_${rt}`;
-      if (!b2csMap[key]) {
-        b2csMap[key] = {
-          sply_ty: s.isInterState ? "INTER" : "INTRA",
-          pos,
-          rt,
-          txval: 0,
-          camt: 0,
-          samt: 0,
-          csamt: 0
-        };
-      }
-      b2csMap[key].txval += s.taxableAmount || 0;
-      b2csMap[key].camt += s.cgst || 0;
-      b2csMap[key].samt += s.sgst || 0;
-    });
-
-    const b2cs = Object.values(b2csMap).map(item => ({
-      ...item,
-      txval: Number(item.txval.toFixed(2)),
-      camt: Number(item.camt.toFixed(2)),
-      samt: Number(item.samt.toFixed(2))
-    }));
-
-    // 3. Table 12 HSN Summary
-    const hsnMap = {};
-    filteredGstr1.forEach(s => {
-      const hsnCode = s.hsnCode || "9989";
-      const desc = s.serviceType || "Printing and Graphic Design Services";
-      if (!hsnMap[hsnCode]) {
-        hsnMap[hsnCode] = {
-          hsn_sc: hsnCode,
-          desc,
-          uqc: "OTH",
-          qty: 0,
-          val: 0,
-          txval: 0,
-          camt: 0,
-          samt: 0,
-          csamt: 0
-        };
-      }
-      hsnMap[hsnCode].qty += 1;
-      hsnMap[hsnCode].val += s.finalAmount || 0;
-      hsnMap[hsnCode].txval += s.taxableAmount || 0;
-      hsnMap[hsnCode].camt += s.cgst || 0;
-      hsnMap[hsnCode].samt += s.sgst || 0;
-    });
-
-    const hsnData = Object.values(hsnMap).map((item, idx) => ({
-      num: idx + 1,
-      hsn_sc: item.hsn_sc,
-      desc: item.desc,
-      uqc: item.uqc,
-      qty: item.qty,
-      val: Number(item.val.toFixed(2)),
-      txval: Number(item.txval.toFixed(2)),
-      camt: Number(item.camt.toFixed(2)),
-      samt: Number(item.samt.toFixed(2)),
-      csamt: 0
-    }));
-
-    const gstr1Payload = {
-      gstin: "33BLQPM9171A1ZA",
-      fp: formatFp(selectedMonth),
-      cur_gt: 0,
-      gt: 0,
-      b2b,
-      b2cs,
-      hsn: {
-        data: hsnData
-      }
-    };
-
-    downloadJSON(gstr1Payload, `GSTR1_Offline_Payload_${selectedMonth || 'All'}.json`);
-    showToast(`Official GSTR-1 GSTN Offline JSON payload exported for ${getMonthLabel(selectedMonth)}!`, 'success');
-  };
-
-  // Export GSTR-3B in Official GSTN Offline JSON Schema
-  const handleExportGstr3bJSON = () => {
-    const { table31, table4, table61 } = gstr3bComputation;
-
-    const gstr3bPayload = {
-      gstin: "33BLQPM9171A1ZA",
-      ret_period: formatFp(selectedMonth),
-      filing_typ: "GSTR3B",
-      sec_sum: {
-        osup_det: {
-          txval: table31.taxable,
-          iamt: table31.igst,
-          camt: table31.cgst,
-          samt: table31.sgst,
-          csamt: 0
-        },
-        itc_elg: {
-          itc_avl: [
-            {
-              ty: "IMPG",
-              iamt: 0,
-              camt: 0,
-              samt: 0,
-              csamt: 0
-            },
-            {
-              ty: "OTH",
-              iamt: table4.igst,
-              camt: table4.cgst,
-              samt: table4.sgst,
-              csamt: 0
-            }
-          ]
-        },
-        tx_pmt: {
-          tx_py: [
-            {
-              trans_typ: 1,
-              trans_desc: "Integrated Tax",
-              liab_ledger_id: 1,
-              tx: table61.igst.liability,
-              iamt: table61.igst.utilized,
-              camt: 0,
-              samt: 0,
-              csamt: 0,
-              pd_cash: table61.igst.cash
-            },
-            {
-              trans_typ: 2,
-              trans_desc: "Central Tax",
-              liab_ledger_id: 2,
-              tx: table61.cgst.liability,
-              iamt: 0,
-              camt: table61.cgst.utilized,
-              samt: 0,
-              csamt: 0,
-              pd_cash: table61.cgst.cash
-            },
-            {
-              trans_typ: 3,
-              trans_desc: "State/UT Tax",
-              liab_ledger_id: 3,
-              tx: table61.sgst.liability,
-              iamt: 0,
-              camt: 0,
-              samt: table61.sgst.utilized,
-              csamt: 0,
-              pd_cash: table61.sgst.cash
-            }
-          ]
-        }
-      }
-    };
-
-    downloadJSON(gstr3bPayload, `GSTR3B_Offline_Payload_${selectedMonth || 'All'}.json`);
-    showToast(`Official GSTR-3B GSTN Offline JSON payload exported for ${getMonthLabel(selectedMonth)}!`, 'success');
-  };
-
-  // Direct 1-Click Statutory Digest to meganfullsd@gmail.com
-  const handleDispatchGstDigestEmail = () => {
-    const periodName = getMonthLabel(selectedMonth);
-    const summary = {
-      period: periodName,
-      dispatchTo: 'meganfullsd@gmail.com',
-      companyDispatchSender: 'meganfullsd@gmail.com',
-      salesOrdersCount: filteredGstr1.length,
-      outwardTaxable: gstr1Totals.taxable,
-      outputTaxLiability: gstr1Totals.cgst + gstr1Totals.sgst + gstr1Totals.igst,
-      inwardBillsCount: filteredGstr2b.length,
-      inwardItcAvailable: gstr2bTotals.totalTax,
-      netCashPayable: gstr3bComputation.table61.totalCashPayable,
-      itcCarryForward: gstr3bComputation.table61.totalItcCarryForward
-    };
-    console.info('[GSTR Email Digest Dispatched]', summary);
-    showToast(`Statutory GST filing digest for ${periodName} dispatched to meganfullsd@gmail.com`, 'success');
-  };
-
   const getMonthLabel = (m) => {
     if (!m) return 'All Periods';
     try {
@@ -841,58 +578,6 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
       return m;
     }
   };
-
-  // Free Tier Lock Banner Check
-  const isGstLocked = !tierConfig?.hasGstReports;
-
-  if (isGstLocked) {
-    return (
-      <div className="max-w-4xl mx-auto py-12 px-4">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-8 sm:p-12 text-center space-y-6">
-          <div className="w-20 h-20 rounded-3xl bg-amber-50 border-2 border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
-            <Lock className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-2 max-w-lg mx-auto">
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800">
-              Feature Locked on {tierConfig?.name || 'Free Trial'}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Statutory GST Returns & Offline Filing
-            </h2>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              GSTR-1 Outward Supplies, GSTR-2B Input Tax Credit reconciliation, and GSTR-3B offline JSON payloads for GSTN Portal are available on <strong>Basic, Pro, and Premium</strong> plans.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl mx-auto text-left pt-2">
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-800 block">GSTR-1 Filing</span>
-              <span className="text-[11px] text-slate-500">B2B, B2CS & HSN Offline JSON ready for portal upload</span>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-800 block">GSTR-2B ITC Match</span>
-              <span className="text-[11px] text-slate-500">Input Tax Credit audit against purchase bills</span>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-800 block">GSTR-3B Computation</span>
-              <span className="text-[11px] text-slate-500">Tax liability offsets & cash payment calculation</span>
-            </div>
-          </div>
-
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={() => onSwitchReport && onSwitchReport('profile')}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Crown className="w-4 h-4 text-amber-300" />
-              <span>Upgrade Plan in Profile Settings</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -933,61 +618,31 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
 
             {/* Quick Export for Current Tab */}
             {activeReport === 'gstr1' && (
-              <>
-                <button
-                  onClick={handleExportGstr1Excel}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
-                  title="Download GSTR-1 in Microsoft Excel"
-                >
-                  <Download className="w-3.5 h-3.5" /> GSTR-1 Excel
-                </button>
-                <button
-                  onClick={handleExportGstr1JSON}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-colors border border-slate-700 cursor-pointer"
-                  title="Official JSON Payload for GSTN Offline Utility"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-rose-400" /> GSTN JSON
-                </button>
-              </>
+              <button
+                onClick={handleExportGstr1Excel}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> GSTR-1 Excel
+              </button>
             )}
 
             {activeReport === 'gstr2b' && (
               <button
                 onClick={handleExportGstr2bExcel}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
               >
                 <Download className="w-3.5 h-3.5" /> GSTR-2B Excel
               </button>
             )}
 
             {activeReport === 'gstr3b' && (
-              <>
-                <button
-                  onClick={handleExportGstr3bExcel}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
-                  title="Download GSTR-3B in Microsoft Excel"
-                >
-                  <Download className="w-3.5 h-3.5" /> GSTR-3B Excel
-                </button>
-                <button
-                  onClick={handleExportGstr3bJSON}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm transition-colors border border-slate-700 cursor-pointer"
-                  title="Official JSON Payload for GSTN Portal / Offline Utility"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-indigo-400" /> GSTN JSON
-                </button>
-              </>
+              <button
+                onClick={handleExportGstr3bExcel}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> GSTR-3B Excel
+              </button>
             )}
-
-            {/* Direct Email Digest to meganfullsd@gmail.com */}
-            <button
-              onClick={handleDispatchGstDigestEmail}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              title="Dispatch Statutory Summary to meganfullsd@gmail.com"
-            >
-              <Send className="w-3.5 h-3.5 text-blue-600" />
-              <span>Email Digest</span>
-            </button>
           </div>
         </div>
 

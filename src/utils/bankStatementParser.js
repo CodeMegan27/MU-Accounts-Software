@@ -531,7 +531,7 @@ export function downloadBankSampleTemplate(bankType) {
       [
         '01/09/2026',
         '01/09/2026',
-        'UPI/624512345678/MU ACCOUNTS/PAYMENT',
+        'UPI/624512345678/RS DESIGNS/PAYMENT',
         'UPI624512345678',
         '00845',
         '',

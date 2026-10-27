@@ -59,6 +59,7 @@ export default function ExpenseForm({ expense, onBack }) {
   };
 
   const isEditing = Boolean(expense);
+  const canEdit = !isEditing || isAdmin;
 
   // Mode: 'voucher' (Itemized Purchase-like Voucher with GST) or 'quick' (Simple direct entry)
   const [formMode, setFormMode] = useState('voucher');
@@ -219,8 +220,8 @@ export default function ExpenseForm({ expense, onBack }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAdmin) {
-      showToast('Admin PIN required to record expenses', 'error');
+    if (isEditing && !isAdmin) {
+      showToast('Admin PIN required to update existing expenses', 'error');
       openLoginModal();
       return;
     }
@@ -297,15 +298,15 @@ export default function ExpenseForm({ expense, onBack }) {
       )}
 
       {/* Guest Mode Restriction Notice */}
-      {!isAdmin && (
+      {isEditing && !isAdmin && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-amber-900">Read-Only Guest Mode</h4>
-              <p className="text-[11px] text-amber-700">Expenses can be manually entered only with Admin Access.</p>
+              <h4 className="text-xs font-bold text-amber-900">Admin PIN Required to Edit</h4>
+              <p className="text-[11px] text-amber-700">Existing expenses can be updated only with Admin Access.</p>
             </div>
           </div>
           <button
@@ -361,9 +362,9 @@ export default function ExpenseForm({ expense, onBack }) {
           <button
             type="submit"
             form="expenseForm"
-            disabled={!isAdmin || isSaving}
+            disabled={!canEdit || isSaving}
             className={`flex items-center gap-1.5 px-6 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
-              !isAdmin ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
+              !canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
             }`}
           >
             <Check className="w-4 h-4" /> {isSaving ? 'Saving...' : isEditing ? 'Update Expense' : 'Save Expense'}
@@ -392,7 +393,7 @@ export default function ExpenseForm({ expense, onBack }) {
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={voucherNo}
                 onChange={(e) => setVoucherNo(e.target.value)}
                 placeholder="e.g. EXP-00123"
@@ -407,7 +408,7 @@ export default function ExpenseForm({ expense, onBack }) {
               <input
                 type="date"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -429,7 +430,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 </button>
               </div>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -444,7 +445,7 @@ export default function ExpenseForm({ expense, onBack }) {
               <label className="block font-semibold text-slate-700 mb-1.5">Payee / Service Provider</label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={payee}
                 onChange={(e) => setPayee(e.target.value)}
                 placeholder="e.g. EB Office / Landlord"
@@ -476,7 +477,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 </button>
               </div>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -502,7 +503,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 </button>
               </div>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -528,7 +529,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 </button>
               </div>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -557,7 +558,7 @@ export default function ExpenseForm({ expense, onBack }) {
                   step="0.01"
                   min="0.01"
                   required
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={quickAmount}
                   onChange={(e) => setQuickAmount(e.target.value)}
                   placeholder="0.00"
@@ -569,7 +570,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 <label className="block font-semibold text-slate-700 mb-1.5">Description / Memo</label>
                 <input
                   type="text"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional expense description"
@@ -586,7 +587,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 <input
                   type="checkbox"
                   id="expGstChk"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   checked={isGst}
                   onChange={(e) => setIsGst(e.target.checked)}
                   className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer disabled:opacity-75"
@@ -602,7 +603,7 @@ export default function ExpenseForm({ expense, onBack }) {
                     <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Payee GSTIN</label>
                     <input
                       type="text"
-                      disabled={!isAdmin}
+                      disabled={!canEdit}
                       value={gstin}
                       onChange={(e) => setGstin(e.target.value)}
                       placeholder="33AAAAA0000A1Z5"
@@ -618,7 +619,7 @@ export default function ExpenseForm({ expense, onBack }) {
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Tax Mode</label>
                     <select
-                      disabled={!isAdmin}
+                      disabled={!canEdit}
                       value={taxType}
                       onChange={(e) => setTaxType(e.target.value)}
                       className="w-full py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -631,7 +632,7 @@ export default function ExpenseForm({ expense, onBack }) {
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">GST Rate (%)</label>
                     <select
-                      disabled={!isAdmin}
+                      disabled={!canEdit}
                       value={taxRate}
                       onChange={(e) => setTaxRate(e.target.value)}
                       className="w-full py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -657,7 +658,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Voucher Particulars / Items</h3>
                   <p className="text-[11px] text-slate-500">
-                    {isAdmin ? 'Admin Mode: You can manually alter Qty, Rate, or Amount directly.' : 'Guest Mode: View Only.'}
+                    {canEdit ? 'You can manually alter Qty, Rate, or Amount directly.' : 'Admin PIN Required: View Only.'}
                   </p>
                 </div>
                 <span className="text-xs text-slate-500 font-medium">{items.length} lines</span>
@@ -684,7 +685,7 @@ export default function ExpenseForm({ expense, onBack }) {
                           <input
                             type="text"
                             required
-                            disabled={!isAdmin}
+                            disabled={!canEdit}
                             value={item.name}
                             onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                             placeholder="e.g. Monthly Office Rent for September"
@@ -693,7 +694,7 @@ export default function ExpenseForm({ expense, onBack }) {
                         </td>
                         <td className="px-4 py-2.5">
                           <select
-                            disabled={!isAdmin}
+                            disabled={!canEdit}
                             value={item.uqc}
                             onChange={(e) => handleItemChange(idx, 'uqc', e.target.value)}
                             className="w-full py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs bg-white uppercase font-mono disabled:opacity-75"
@@ -712,7 +713,7 @@ export default function ExpenseForm({ expense, onBack }) {
                             step="0.01"
                             min="0.01"
                             required
-                            disabled={!isAdmin}
+                            disabled={!canEdit}
                             value={item.qty}
                             onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
                             className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -724,7 +725,7 @@ export default function ExpenseForm({ expense, onBack }) {
                             step="0.01"
                             min="0"
                             required
-                            disabled={!isAdmin}
+                            disabled={!canEdit}
                             value={item.rate}
                             onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
                             className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -737,11 +738,11 @@ export default function ExpenseForm({ expense, onBack }) {
                               type="number"
                               step="0.01"
                               min="0"
-                              disabled={!isAdmin}
+                              disabled={!canEdit}
                               value={item.amount}
                               onChange={(e) => handleAmountChange(idx, e.target.value)}
                               className={`w-full pl-5 pr-2.5 py-1.5 rounded-lg text-xs text-right font-mono font-bold focus:outline-none transition-all ${
-                                isAdmin 
+                                canEdit 
                                   ? 'bg-emerald-50/60 border border-emerald-300 text-emerald-900 focus:bg-white focus:ring-1 focus:ring-emerald-500' 
                                   : 'bg-slate-100 border border-slate-200 text-slate-700 cursor-not-allowed opacity-80'
                               }`}
@@ -749,7 +750,7 @@ export default function ExpenseForm({ expense, onBack }) {
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-center">
-                          {isAdmin && (
+                          {canEdit && (
                             <button
                               type="button"
                               onClick={() => removeItemRow(idx)}
@@ -766,7 +767,7 @@ export default function ExpenseForm({ expense, onBack }) {
                 </table>
               </div>
 
-              {isAdmin && (
+              {canEdit && (
                 <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
                   <button
                     type="button"
@@ -786,7 +787,7 @@ export default function ExpenseForm({ expense, onBack }) {
                   <label className="block font-semibold text-slate-700 mb-1">Expense Remarks / Description</label>
                   <textarea
                     rows="3"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="e.g. Paid online via NEFT for office lease"
@@ -805,7 +806,7 @@ export default function ExpenseForm({ expense, onBack }) {
                     <input
                       type="checkbox"
                       id="expRoundOff"
-                      disabled={!isAdmin}
+                      disabled={!canEdit}
                       checked={isRoundOff}
                       onChange={(e) => setIsRoundOff(e.target.checked)}
                       className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer disabled:opacity-75"

@@ -3,24 +3,16 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-// Register Service Worker only on production domains; on localhost, unregister to avoid stale cache hijacking
+// Ensure no stale service workers or offline caches hijack new production releases
 if ('serviceWorker' in navigator) {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      for (const reg of regs) {
-        reg.unregister();
-      }
-    });
-    if ('caches' in window) {
-      caches.keys().then((names) => {
-        for (const name of names) caches.delete(name);
-      });
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    for (const reg of regs) {
+      reg.unregister();
     }
-  } else {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.warn('Service Worker registration notice:', err);
-      });
+  });
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      for (const name of names) caches.delete(name);
     });
   }
 }

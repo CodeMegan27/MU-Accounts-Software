@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { ArrowLeft, Check, Users, Lock } from 'lucide-react';
+import { ArrowLeft, Check, Users, Lock, Landmark } from 'lucide-react';
 
 export default function VendorForm({ vendor, onBack }) {
-  const { saveVendor, vendors = [] } = useData();
-  const { isAdmin, openLoginModal, tierConfig, isDeveloper } = useAuth();
+  const { saveVendor } = useData();
+  const { isAdmin, openLoginModal } = useAuth();
   const { showToast } = useToast();
 
   const isEditing = Boolean(vendor);
+  const canEdit = !isEditing || isAdmin;
 
   const [name, setName] = useState('');
   const [isGst, setIsGst] = useState(false);
@@ -17,6 +18,9 @@ export default function VendorForm({ vendor, onBack }) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [openingBalance, setOpeningBalance] = useState('');
+  const [openingBalanceType, setOpeningBalanceType] = useState('payable');
+  const [openingBalanceDate, setOpeningBalanceDate] = useState('2026-04-01');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -27,6 +31,9 @@ export default function VendorForm({ vendor, onBack }) {
       setPhone(vendor.phone || '');
       setEmail(vendor.email || '');
       setAddress(vendor.address || '');
+      setOpeningBalance(vendor.openingBalance !== undefined && vendor.openingBalance !== null && vendor.openingBalance !== '' ? String(vendor.openingBalance) : '');
+      setOpeningBalanceType(vendor.openingBalanceType || 'payable');
+      setOpeningBalanceDate(vendor.openingBalanceDate || '2026-04-01');
     } else {
       setName('');
       setIsGst(false);
@@ -34,19 +41,17 @@ export default function VendorForm({ vendor, onBack }) {
       setPhone('');
       setEmail('');
       setAddress('');
+      setOpeningBalance('');
+      setOpeningBalanceType('payable');
+      setOpeningBalanceDate('2026-04-01');
     }
   }, [vendor]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAdmin) {
-      showToast('Admin PIN required to save vendor details', 'error');
+    if (isEditing && !isAdmin) {
+      showToast('Admin PIN required to update existing vendor details', 'error');
       openLoginModal();
-      return;
-    }
-    const maxV = tierConfig?.maxVendors || 20;
-    if (!isEditing && vendors.length >= maxV) {
-      showToast(`Vendor creation cap reached (${vendors.length}/${maxV}) on ${tierConfig?.name || 'current tier'}. Upgrade in Profile Settings to add more suppliers.`, 'warning');
       return;
     }
     if (!name.trim()) {
@@ -63,7 +68,10 @@ export default function VendorForm({ vendor, onBack }) {
         gstin: isGst ? gstin.trim().toUpperCase() : '',
         phone: phone.trim(),
         email: email.trim(),
-        address: address.trim()
+        address: address.trim(),
+        openingBalance: openingBalance ? parseFloat(openingBalance) : 0,
+        openingBalanceType: openingBalanceType || 'payable',
+        openingBalanceDate: openingBalanceDate || '2026-04-01'
       };
 
       await saveVendor(data);
@@ -79,15 +87,15 @@ export default function VendorForm({ vendor, onBack }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-      {!isAdmin && (
+      {isEditing && !isAdmin && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-amber-900">Read-Only Guest Mode</h4>
-              <p className="text-[11px] text-amber-700">Vendor fields can be manually entered only with Admin Access.</p>
+              <h4 className="text-xs font-bold text-amber-900">Admin PIN Required to Edit</h4>
+              <p className="text-[11px] text-amber-700">Existing vendor profiles can be updated only with Admin Access.</p>
             </div>
           </div>
           <button
@@ -120,9 +128,9 @@ export default function VendorForm({ vendor, onBack }) {
           <button
             type="submit"
             form="vendorForm"
-            disabled={!isAdmin || isSaving}
+            disabled={!canEdit || isSaving}
             className={`flex items-center gap-1.5 px-6 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
-              !isAdmin ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
+              !canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
             }`}
           >
             <Check className="w-4 h-4" /> {isSaving ? 'Saving...' : isEditing ? 'Update Vendor' : 'Save Vendor'}
@@ -146,7 +154,7 @@ export default function VendorForm({ vendor, onBack }) {
           <input
             type="text"
             required
-            disabled={!isAdmin}
+            disabled={!canEdit}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. SREE RAMAN AGENCIES"
@@ -160,7 +168,7 @@ export default function VendorForm({ vendor, onBack }) {
             <input
               type="checkbox"
               id="vGst"
-              disabled={!isAdmin}
+              disabled={!canEdit}
               checked={isGst}
               onChange={(e) => setIsGst(e.target.checked)}
               className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer disabled:opacity-75"
@@ -178,7 +186,7 @@ export default function VendorForm({ vendor, onBack }) {
               <input
                 type="text"
                 required={isGst}
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={gstin}
                 onChange={(e) => setGstin(e.target.value)}
                 placeholder="33BMCPS7033J1ZY"
@@ -193,7 +201,7 @@ export default function VendorForm({ vendor, onBack }) {
             <label className="block font-semibold text-slate-700 mb-1">Contact Phone / Mobile</label>
             <input
               type="tel"
-              disabled={!isAdmin}
+              disabled={!canEdit}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="e.g. 9842012345"
@@ -204,7 +212,7 @@ export default function VendorForm({ vendor, onBack }) {
             <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
             <input
               type="email"
-              disabled={!isAdmin}
+              disabled={!canEdit}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="vendor@company.com"
@@ -213,11 +221,78 @@ export default function VendorForm({ vendor, onBack }) {
           </div>
         </div>
 
+        {/* Opening Balance Setup */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                <Landmark className="w-4 h-4 text-brand-600" /> Opening Balance Setup
+              </h4>
+              <p className="text-[11px] text-slate-500">Initial balance or advance brought forward before regular billing</p>
+            </div>
+            {openingBalance && parseFloat(openingBalance) > 0 && (
+              <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wider ${
+                openingBalanceType === 'advance' 
+                  ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                  : 'bg-amber-100 text-amber-900 border border-amber-200'
+              }`}>
+                {openingBalanceType === 'advance' ? 'Advance Paid (Credit)' : 'Net Payable (Debit / To Pay)'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Opening Balance (₹)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                disabled={!canEdit}
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(e.target.value)}
+                placeholder="0.00"
+                className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75 shadow-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Balance Type
+              </label>
+              <select
+                disabled={!canEdit}
+                value={openingBalanceType}
+                onChange={(e) => setOpeningBalanceType(e.target.value)}
+                className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75 shadow-xs"
+              >
+                <option value="payable">Payable (To Pay / Dr)</option>
+                <option value="advance">Advance Paid (Credit / Cr)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                As of Date
+              </label>
+              <input
+                type="date"
+                disabled={!canEdit}
+                value={openingBalanceDate}
+                onChange={(e) => setOpeningBalanceDate(e.target.value)}
+                className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75 shadow-xs"
+              />
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="block font-semibold text-slate-700 mb-1">Billing Address & Location</label>
           <textarea
             rows="3"
-            disabled={!isAdmin}
+            disabled={!canEdit}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Street address, City, District, PIN Code"

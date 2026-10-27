@@ -19,14 +19,10 @@ import {
   Landmark,
   ChevronDown,
   ChevronRight,
-  GitBranch
+  ArrowDownLeft
 } from 'lucide-react';
-import { useSettings } from '../../context/SettingsContext';
-import { useAuth } from '../../context/AuthContext';
 
 export default function Sidebar({ activeTab, onSelectTab, isCollapsed, isMobileOpen, onCloseMobile }) {
-  const { profile } = useSettings();
-  const { tierConfig } = useAuth();
   const [gstMenuOpen, setGstMenuOpen] = useState(true);
 
   const navSections = [
@@ -34,7 +30,6 @@ export default function Sidebar({ activeTab, onSelectTab, isCollapsed, isMobileO
       title: "Core",
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'masters', label: 'Branch & Dept Master', icon: GitBranch },
         { id: 'vendors', label: 'Vendor List', icon: Users },
         { id: 'items', label: 'Product List', icon: Package },
         { id: 'expenses', label: 'Expenses', icon: Receipt },
@@ -45,9 +40,11 @@ export default function Sidebar({ activeTab, onSelectTab, isCollapsed, isMobileO
       title: "Registers",
       items: [
         { id: 'bills', label: 'Purchase Register', icon: FileText },
+        { id: 'payables', label: 'Vendor Payables', icon: CreditCard },
         { id: 'sales', label: 'Sales Register', icon: TrendingUp },
+        { id: 'receivables', label: 'Customer Receivables', icon: ArrowDownLeft },
         { id: 'salesOrders', label: 'Sales Orders', icon: ClipboardList },
-        { id: 'vouchers', label: 'Payment & Receipt Book', icon: CreditCard },
+        { id: 'vouchers', label: 'Payment & Receipt Book', icon: Receipt },
       ]
     },
     {
@@ -92,19 +89,19 @@ export default function Sidebar({ activeTab, onSelectTab, isCollapsed, isMobileO
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-800 gap-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center p-0.5 flex-shrink-0 shadow-sm border border-slate-700 overflow-hidden">
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center p-0.5 flex-shrink-0 shadow-sm border border-slate-700 overflow-hidden">
             <img 
-              src={profile?.logoUrl || "/mu_accounts_logo.svg"} 
-              alt={profile?.businessName || "MU Accounts"} 
+              src="/rs_designs_logo.jpg" 
+              alt="RS DESIGNS" 
               className="w-full h-full object-contain"
             />
           </div>
           {(!isCollapsed || mobile) && (
-            <div className="overflow-hidden whitespace-nowrap min-w-0">
-              <h2 className="font-black text-white text-sm sm:text-base tracking-wide flex items-center gap-1.5 truncate">
-                <span>{profile?.businessName || "MU Accounts"}</span>
+            <div className="overflow-hidden whitespace-nowrap">
+              <h2 className="font-black text-white text-base tracking-wide flex items-center gap-1.5">
+                <span>RS DESIGNS</span>
               </h2>
-              <p className="text-[10px] text-blue-400 font-bold tracking-wider uppercase">Cloud ERP Edition</p>
+              <p className="text-[10px] text-rose-400 font-bold tracking-wider uppercase">Enterprise Edition</p>
             </div>
           )}
         </div>
@@ -197,22 +194,14 @@ export default function Sidebar({ activeTab, onSelectTab, isCollapsed, isMobileO
         ))}
       </nav>
 
-      {/* Footer Branding & Subscription Tier */}
-      <div className="mt-auto p-3.5 border-t border-slate-800/80 text-center">
+      {/* Footer Branding */}
+      <div className="mt-auto p-4 border-t border-slate-800/80 text-center">
         {(!isCollapsed || mobile) ? (
-          <div className="space-y-1">
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-wider">
-                {tierConfig?.badge || 'Premium Tier'}
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-500 font-medium tracking-wider opacity-75">
-              MU Software Enterprise
-            </div>
+          <div className="text-[10px] text-slate-500 font-medium tracking-wider opacity-75">
+            Built by <span className="text-slate-300 font-semibold">Meganathan</span>
           </div>
         ) : (
-          <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto" title={tierConfig?.badge || 'MU Accounts'} />
+          <div className="w-2 h-2 rounded-full bg-brand-500 mx-auto" title="Built by Meganathan" />
         )}
       </div>
     </>

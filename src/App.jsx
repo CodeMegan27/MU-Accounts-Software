@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { DataProvider, useData } from './context/DataContext';
@@ -10,11 +10,9 @@ import Sidebar from './components/layout/Sidebar';
 import AdminLoginModal from './components/layout/AdminLoginModal';
 import ConfirmModal from './components/layout/ConfirmModal';
 import LoadingScreen from './components/layout/LoadingScreen';
-import LoginPage from './components/auth/LoginPage';
 
 // Module Components
 import Dashboard from './components/dashboard/Dashboard';
-import BranchDeptMaster from './components/masters/BranchDeptMaster';
 import BillsList from './components/bills/BillsList';
 import BillForm from './components/bills/BillForm';
 import BillDetail from './components/bills/BillDetail';
@@ -48,6 +46,8 @@ import DayBook from './components/daybook/DayBook';
 import { createNewDraft } from './utils/draftManager';
 import BankAccounts from './components/bank/BankAccounts';
 import ChatbotDrawer from './components/chatbot/ChatbotDrawer';
+import PayablesView from './components/payables/PayablesView';
+import ReceivablesView from './components/receivables/ReceivablesView';
 
 
 function AppContent() {
@@ -76,17 +76,20 @@ function AppContent() {
   const [paymentBill, setPaymentBill] = useState(null);
   const [paymentSale, setPaymentSale] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, col: null, id: null, title: '' });
+  const [vendorSourceTab, setVendorSourceTab] = useState('vendors');
+  const [billSourceTab, setBillSourceTab] = useState('bills');
 
-  const { loading, dismissLoading, deleteBill, deleteVendor, deleteItem, deleteExpense, deleteAsset } = useData();
-  const { isAuthenticated, isAdmin, openLoginModal } = useAuth();
+  const { loading, dismissLoading, deleteBill, deleteVendor, deleteItem, deleteExpense, deleteAsset, vendors } = useData();
+  const { isAdmin, openLoginModal } = useAuth();
   const { showToast } = useToast();
+
+  const currentActiveVendor = useMemo(() => {
+    if (!activeVendor) return null;
+    return (vendors || []).find(v => v.id === activeVendor.id) || activeVendor;
+  }, [activeVendor, vendors]);
 
   if (loading) {
     return <LoadingScreen onSkip={dismissLoading} />;
-  }
-
-  if (!isAuthenticated) {
-    return <LoginPage />;
   }
 
   // Navigation Handlers
@@ -106,48 +109,43 @@ function AppContent() {
 
   // Bill Actions
   const handleOpenCreateBill = () => {
-    if (!isAdmin) {
-      showToast('Admin PIN required to create purchase bills', 'info');
-      openLoginModal();
-    }
     setActiveBillId(null);
     const newDraft = createNewDraft('bill');
     setActiveBillDraft(newDraft);
     setActiveTab('createBill');
   };
 
-  const handleEditBill = (id) => {
+  const handleEditBill = (id, source = 'bills') => {
     if (!isAdmin) {
       showToast('Admin PIN required to edit purchase bills', 'info');
       openLoginModal();
       return;
     }
     setActiveBillId(id);
+    setBillSourceTab(source);
     setActiveTab('createBill');
   };
 
-  const handleViewBill = (id) => {
+  const handleViewBill = (id, source = 'bills') => {
     setActiveBillId(id);
+    setBillSourceTab(source);
     setActiveTab('billDetail');
   };
 
   // Vendor Actions
   const handleOpenCreateVendor = () => {
-    if (!isAdmin) {
-      showToast('Admin PIN required to add vendors', 'info');
-      openLoginModal();
-    }
     setActiveVendor(null);
     setActiveTab('createVendor');
   };
 
-  const handleEditVendor = (vendor) => {
+  const handleEditVendor = (vendor, source = 'vendors') => {
     if (!isAdmin) {
       showToast('Admin PIN required to edit vendors', 'info');
       openLoginModal();
       return;
     }
     setActiveVendor(vendor);
+    setVendorSourceTab(source);
     setActiveTab('createVendor');
   };
 
@@ -158,10 +156,6 @@ function AppContent() {
 
   // Item Actions
   const handleOpenCreateItem = () => {
-    if (!isAdmin) {
-      showToast('Admin PIN required to catalog items', 'info');
-      openLoginModal();
-    }
     setActiveItem(null);
     setActiveTab('createItem');
   };
@@ -177,10 +171,6 @@ function AppContent() {
 
   // Expense Actions
   const handleOpenCreateExpense = () => {
-    if (!isAdmin) {
-      showToast('Admin PIN required to record expenses', 'info');
-      openLoginModal();
-    }
     setActiveExpense(null);
     setActiveTab('createExpense');
   };
@@ -196,10 +186,6 @@ function AppContent() {
 
   // Asset Actions
   const handleOpenCreateAsset = () => {
-    if (!isAdmin) {
-      showToast('Admin PIN required to record assets', 'info');
-      openLoginModal();
-    }
     setActiveAsset(null);
     setActiveTab('createAsset');
   };
@@ -287,14 +273,30 @@ function AppContent() {
                 setActiveTab('saleDetail');
               }}
               onRecordPayment={handleOpenSalePaymentModal}
+              onOpenVendorLedger={handleOpenVendorLedger}
+              onOpenPaymentModal={handleOpenPaymentModal}
             />
           )}
 
-          {/* Branch & Department Master (Core Container) */}
-          {activeTab === 'masters' && (
-            <BranchDeptMaster 
-              onNavigateToSales={() => handleSelectTab('sales')}
-              onNavigateToBills={() => handleSelectTab('bills')}
+          {/* Accounts Payable & Vendor Aging Register */}
+          {activeTab === 'payables' && (
+            <PayablesView
+              onOpenLedger={handleOpenVendorLedger}
+              onViewBill={(id) => handleViewBill(id, 'payables')}
+              onOpenPaymentModal={handleOpenPaymentModal}
+              onNavigate={handleSelectTab}
+            />
+          )}
+
+          {/* Accounts Receivable & Customer Aging Register */}
+          {activeTab === 'receivables' && (
+            <ReceivablesView
+              onViewSale={(sale) => {
+                setActiveSale(sale);
+                setActiveTab('saleDetail');
+              }}
+              onRecordPayment={handleOpenSalePaymentModal}
+              onNavigate={handleSelectTab}
             />
           )}
 
@@ -396,18 +398,18 @@ function AppContent() {
             <BillForm
               billId={activeBillId}
               draftBill={activeBillDraft}
-              onBack={() => handleSelectTab('bills')}
+              onBack={() => handleSelectTab(billSourceTab === 'vendorLedger' ? 'vendorLedger' : 'bills')}
               onQuickAddVendor={() => handleSelectTab('createVendor')}
-              onViewBill={handleViewBill}
+              onViewBill={(id) => handleViewBill(id, billSourceTab)}
             />
           )}
 
           {activeTab === 'billDetail' && (
             <BillDetail
               billId={activeBillId}
-              onBack={() => handleSelectTab('bills')}
+              onBack={() => handleSelectTab(billSourceTab === 'vendorLedger' ? 'vendorLedger' : 'bills')}
               onOpenPaymentModal={handleOpenPaymentModal}
-              onEditBill={handleEditBill}
+              onEditBill={(id) => handleEditBill(id, billSourceTab)}
             />
           )}
 
@@ -422,16 +424,20 @@ function AppContent() {
 
           {activeTab === 'createVendor' && (
             <VendorForm
-              vendor={activeVendor}
-              onBack={() => handleSelectTab('vendors')}
+              vendor={currentActiveVendor}
+              onBack={() => handleSelectTab(vendorSourceTab === 'vendorLedger' ? 'vendorLedger' : 'vendors')}
             />
           )}
 
           {activeTab === 'vendorLedger' && (
             <VendorLedger
-              vendor={activeVendor}
+              vendor={currentActiveVendor}
               onBack={() => handleSelectTab('vendors')}
-              onViewBill={handleViewBill}
+              onViewBill={(id) => handleViewBill(id, 'vendorLedger')}
+              onEditBill={(id) => handleEditBill(id, 'vendorLedger')}
+              onEditExpense={handleEditExpense}
+              onEditAsset={handleEditAsset}
+              onEditVendor={(v) => handleEditVendor(v, 'vendorLedger')}
             />
           )}
 

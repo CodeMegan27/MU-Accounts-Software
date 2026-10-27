@@ -20,7 +20,7 @@ import {
 
 export default function ItemsList({ onOpenCreateItem, onEditItem, onRequestDelete }) {
   const { items, syncItemsFromSalesData } = useData();
-  const { isAdmin, tierConfig, isDeveloper } = useAuth();
+  const { isAdmin } = useAuth();
   const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -112,14 +112,7 @@ export default function ItemsList({ onOpenCreateItem, onEditItem, onRequestDelet
             <span>{isSyncing ? 'Syncing...' : 'Sync from Sales Data'}</span>
           </button>
           <button
-            onClick={() => {
-              const maxP = tierConfig?.maxProducts || 50;
-              if (items.length >= maxP) {
-                showToast(`Product catalog limit reached (${items.length}/${maxP}) on ${tierConfig?.name || 'current tier'}. Upgrade in Profile Settings to add more products.`, 'warning');
-                return;
-              }
-              onOpenCreateItem();
-            }}
+            onClick={onOpenCreateItem}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white rounded-xl text-xs font-semibold transition-all shadow-sm hover:shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Item
@@ -130,16 +123,9 @@ export default function ItemsList({ onOpenCreateItem, onEditItem, onRequestDelet
       {/* KPI Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Catalog Items</p>
-            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-brand-50 text-brand-700">
-              Limit: {tierConfig?.maxProducts >= 9000 ? '∞' : tierConfig?.maxProducts || 50}
-            </span>
-          </div>
-          <p className="text-xl font-black text-slate-900 mt-1">
-            {items.length} <span className="text-xs text-slate-400 font-normal">/ {tierConfig?.maxProducts >= 9000 ? '∞' : tierConfig?.maxProducts || 50}</span>
-          </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">{tierConfig?.badge || 'Plan'} Capacity</p>
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Catalog Items</p>
+          <p className="text-xl font-black text-slate-900 mt-1">{items.length}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Standardized catalog</p>
         </div>
         <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 shadow-xs">
           <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Physical Products</p>
@@ -252,24 +238,22 @@ export default function ItemsList({ onOpenCreateItem, onEditItem, onRequestDelet
                       {item.defaultRate ? formatCurrency(item.defaultRate) : '-'}
                     </td>
                     <td className="px-6 py-3.5 text-center">
-                      {isAdmin && (
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => onEditItem(item)}
                             className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                            title="Edit Item"
+                            title="Edit Item (Admin PIN Required)"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => onRequestDelete('items', item.id, item.name)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete Item"
+                            title="Delete Item (Admin PIN Required)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      )}
                     </td>
                   </tr>
                 ))

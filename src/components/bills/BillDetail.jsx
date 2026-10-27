@@ -104,8 +104,8 @@ export default function BillDetail({ billId, onBack, onOpenPaymentModal }) {
           <div className="flex flex-col sm:flex-row items-start gap-4 w-full sm:w-auto">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border border-slate-200 p-1 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
               <img 
-                src={profile.logoUrl || "/mu_accounts_logo.svg"} 
-                alt={profile.businessName || "MU Accounts"} 
+                src="/rs_designs_logo.jpg" 
+                alt="RS DESIGNS" 
                 className="w-full h-full object-contain"
               />
             </div>
@@ -114,8 +114,8 @@ export default function BillDetail({ billId, onBack, onOpenPaymentModal }) {
                 Official Purchase Bill
               </span>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900">
-                  {profile.businessName || 'MU Accounts'}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-600 to-blue-700">
+                  {profile.businessName || 'RS DESIGNS'}
                 </span>
               </h1>
               <p className="text-[11px] font-bold text-slate-700 uppercase mt-0.5">

@@ -39,6 +39,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
   const { showToast } = useToast();
 
   const isEditing = Boolean(billId);
+  const canEdit = !isEditing || isAdmin;
   const existingBill = useMemo(() => bills.find(b => b.id === billId), [bills, billId]);
 
   // Draft Management State
@@ -347,8 +348,8 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
     if (e) e.preventDefault();
     if (isSaving) return;
 
-    if (!isAdmin) {
-      showToast('Admin access required to save changes. Please enter Admin PIN.', 'error');
+    if (isEditing && !isAdmin) {
+      showToast('Admin access required to save changes to existing bills. Please enter Admin PIN.', 'error');
       openLoginModal();
       return;
     }
@@ -516,6 +517,28 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
         </div>
       )}
 
+      {/* Admin PIN Required Banner when editing an existing bill as guest */}
+      {isEditing && !isAdmin && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-amber-900">Admin PIN Required to Edit</h4>
+              <p className="text-[11px] text-amber-700">Existing purchase bills can only be updated or altered with Admin Access.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openLoginModal}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5"
+          >
+            <Lock className="w-3.5 h-3.5" /> Unlock Admin Access
+          </button>
+        </div>
+      )}
+
       {/* Top Header - No overlay clipping */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative z-10">
         <button
@@ -576,9 +599,9 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
           <button
             type="submit"
             form="billForm"
-            disabled={!isAdmin || isSaving}
+            disabled={!canEdit || isSaving}
             className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
-              !isAdmin
+              !canEdit
                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 : 'bg-brand-600 hover:bg-brand-700 text-white active:bg-brand-800'
             }`}
@@ -604,7 +627,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <div className="flex gap-2">
                 <select
                   required
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={vendorId}
                   onChange={(e) => handleVendorChange(e.target.value)}
                   className="flex-1 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white disabled:opacity-75"
@@ -614,7 +637,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                     <option key={v.id} value={v.id}>{v.name}</option>
                   ))}
                 </select>
-                {isAdmin && (
+                {canEdit && (
                   <button
                     type="button"
                     onClick={onQuickAddVendor}
@@ -635,7 +658,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
                 placeholder="e.g. INV-1049"
@@ -651,7 +674,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <input
                 type="date"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -689,7 +712,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <input
                 type="checkbox"
                 id="isGstChk"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 checked={isGst}
                 onChange={(e) => setIsGst(e.target.checked)}
                 className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer disabled:opacity-75"
@@ -705,7 +728,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                   <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Vendor GSTIN</label>
                   <input
                     type="text"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     value={gstin}
                     onChange={(e) => setGstin(e.target.value)}
                     placeholder="33AAAAA0000A1Z5"
@@ -721,7 +744,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Tax Mode</label>
                   <select
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     value={taxType}
                     onChange={(e) => setTaxType(e.target.value)}
                     className="w-full py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -734,7 +757,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">GST Rate (%)</label>
                   <select
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     value={taxRate}
                     onChange={(e) => setTaxRate(e.target.value)}
                     className="w-full py-1.5 px-3 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -757,7 +780,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
             <div>
               <h3 className="text-base font-bold text-slate-900">Line Items & Products</h3>
               <p className="text-[11px] text-slate-500">
-                {isAdmin ? 'Admin Mode: You can manually alter Qty, Rate, OR Amount directly.' : 'Guest Mode: View Only.'}
+                {canEdit ? 'You can manually alter Qty, Rate, OR Amount directly.' : 'Admin PIN Required: View Only.'}
               </p>
             </div>
             <span className="text-xs text-slate-500 font-medium">{items.length} items entered</span>
@@ -772,7 +795,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                   <th className="px-4 py-3 w-28">UQC</th>
                   <th className="px-4 py-3 w-28 text-right">Qty *</th>
                   <th className="px-4 py-3 w-36 text-right">Rate (₹) *</th>
-                  <th className="px-4 py-3 w-40 text-right">Amount (₹) {isAdmin && <span className="text-brand-600 font-normal">(Editable)</span>}</th>
+                  <th className="px-4 py-3 w-40 text-right">Amount (₹) {canEdit && <span className="text-brand-600 font-normal">(Editable)</span>}</th>
                   <th className="px-4 py-3 w-12 text-center"></th>
                 </tr>
               </thead>
@@ -787,7 +810,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                         <input
                           type="text"
                           required
-                          disabled={!isAdmin}
+                          disabled={!canEdit}
                           value={item.name}
                           onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                           placeholder="Type or select product"
@@ -803,7 +826,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                     </td>
                     <td className="px-4 py-2.5">
                       <select
-                        disabled={!isAdmin}
+                        disabled={!canEdit}
                         value={item.uqc}
                         onChange={(e) => handleItemChange(idx, 'uqc', e.target.value)}
                         className="w-full py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 uppercase font-mono disabled:opacity-75"
@@ -824,7 +847,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                         step="0.01"
                         min="0.01"
                         required
-                        disabled={!isAdmin}
+                        disabled={!canEdit}
                         value={item.qty}
                         onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
                         className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
@@ -836,14 +859,14 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                         step="0.01"
                         min="0"
                         required
-                        disabled={!isAdmin}
+                        disabled={!canEdit}
                         value={item.rate}
                         onChange={(e) => handleItemChange(idx, 'rate', e.target.value)}
                         className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
                       />
                     </td>
 
-                    {/* Amount Field: In Admin Mode, user CAN alter this directly! In Guest Mode, read-only! */}
+                    {/* Amount Field: Editable when canEdit */}
                     <td className="px-4 py-2.5">
                       <div className="relative">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-[10px]">₹</span>
@@ -851,12 +874,12 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                           type="number"
                           step="0.01"
                           min="0"
-                          disabled={!isAdmin}
+                          disabled={!canEdit}
                           value={item.amount}
                           onChange={(e) => handleAmountChange(idx, e.target.value)}
-                          title={isAdmin ? "You can manually alter the amount in Admin Mode" : "Locked in Guest Mode"}
+                          title={canEdit ? "You can manually alter the amount" : "Admin PIN Required"}
                           className={`w-full pl-5 pr-2.5 py-1.5 rounded-lg text-xs text-right font-mono font-bold focus:outline-none transition-all ${
-                            isAdmin 
+                            canEdit 
                               ? 'bg-emerald-50/60 border border-emerald-300 text-emerald-900 focus:bg-white focus:ring-1 focus:ring-emerald-500' 
                               : 'bg-slate-100 border border-slate-200 text-slate-700 cursor-not-allowed opacity-80'
                           }`}
@@ -865,7 +888,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                     </td>
 
                     <td className="px-4 py-2.5 text-center">
-                      {isAdmin && (
+                      {canEdit && (
                         <button
                           type="button"
                           onClick={() => removeItemRow(idx)}
@@ -882,7 +905,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
             </table>
           </div>
 
-          {isAdmin && (
+          {canEdit && (
             <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
               <button
                 type="button"
@@ -903,7 +926,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <label className="block text-xs font-semibold text-slate-700 mb-1">Internal Remarks / Notes</label>
               <textarea
                 rows="3"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Received via Transporter LR #1234, PO reference #987"
@@ -923,7 +946,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                 <input
                   type="checkbox"
                   id="roundOffToggle"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   checked={isRoundOff}
                   onChange={(e) => setIsRoundOff(e.target.checked)}
                   className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer disabled:opacity-75"
@@ -950,7 +973,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                   type="number"
                   min="0"
                   step="0.01"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={packing}
                   onChange={(e) => setPacking(e.target.value)}
                   className="w-full pl-6 pr-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-right font-mono text-white focus:outline-none focus:border-brand-500 disabled:opacity-75"
@@ -966,7 +989,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
                   type="number"
                   min="0"
                   step="0.01"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
                   className="w-full pl-6 pr-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-right font-mono text-white focus:outline-none focus:border-brand-500 disabled:opacity-75"

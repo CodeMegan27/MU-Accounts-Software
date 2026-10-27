@@ -349,7 +349,7 @@ export default function AssetsList({ onOpenCreateAsset, onEditAsset, onRequestDe
                               Unpaid (Bal: {formatCurrency(bal)})
                             </span>
                           )}
-                          {bal > 0 && isAdmin && (
+                          {bal > 0 && (
                             <button
                               onClick={() => setPaymentModalAsset(asset)}
                               className="text-[10px] font-bold text-brand-700 hover:text-brand-900 flex items-center gap-1 hover:underline"
@@ -362,24 +362,22 @@ export default function AssetsList({ onOpenCreateAsset, onEditAsset, onRequestDe
 
                       {/* Actions */}
                       <td className="px-5 py-3.5 text-center">
-                        {isAdmin && (
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => onEditAsset(asset)}
-                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Edit Asset GST Bill"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => onRequestDelete('assets', asset.id, asset.name)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete Asset"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => onEditAsset(asset)}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Edit Asset GST Bill (Admin PIN Required)"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onRequestDelete('assets', asset.id, asset.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Asset (Admin PIN Required)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

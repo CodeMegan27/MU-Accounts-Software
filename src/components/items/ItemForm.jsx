@@ -5,11 +5,12 @@ import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Check, Package, Lock } from 'lucide-react';
 
 export default function ItemForm({ item, onBack }) {
-  const { saveItem, items = [] } = useData();
-  const { isAdmin, openLoginModal, tierConfig, isDeveloper } = useAuth();
+  const { saveItem } = useData();
+  const { isAdmin, openLoginModal } = useAuth();
   const { showToast } = useToast();
 
   const isEditing = Boolean(item);
+  const canEdit = !isEditing || isAdmin;
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -33,14 +34,9 @@ export default function ItemForm({ item, onBack }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAdmin) {
+    if (isEditing && !isAdmin) {
       showToast('Admin PIN required to edit item catalog', 'error');
       openLoginModal();
-      return;
-    }
-    const maxP = tierConfig?.maxProducts || 50;
-    if (!isEditing && items.length >= maxP) {
-      showToast(`Product catalog limit reached (${items.length}/${maxP}) on ${tierConfig?.name || 'current tier'}. Upgrade in Profile Settings to add more products.`, 'warning');
       return;
     }
     if (!name.trim()) {
@@ -71,15 +67,15 @@ export default function ItemForm({ item, onBack }) {
 
   return (
     <div className="max-w-xl mx-auto space-y-6 pb-20">
-      {!isAdmin && (
+      {isEditing && !isAdmin && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-amber-900">Read-Only Guest Mode</h4>
-              <p className="text-[11px] text-amber-700">Catalog items can be entered only with Admin Access.</p>
+              <h4 className="text-xs font-bold text-amber-900">Admin PIN Required to Edit</h4>
+              <p className="text-[11px] text-amber-700">Existing catalog items can be updated only with Admin Access.</p>
             </div>
           </div>
           <button
@@ -111,9 +107,9 @@ export default function ItemForm({ item, onBack }) {
           <button
             type="submit"
             form="itemForm"
-            disabled={!isAdmin || isSaving}
+            disabled={!canEdit || isSaving}
             className={`flex items-center gap-1.5 px-6 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
-              !isAdmin ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
+              !canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'
             }`}
           >
             <Check className="w-4 h-4" /> {isSaving ? 'Saving...' : isEditing ? 'Update Item' : 'Save Item'}
@@ -136,7 +132,7 @@ export default function ItemForm({ item, onBack }) {
           <input
             type="text"
             required
-            disabled={!isAdmin}
+            disabled={!canEdit}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Copper Wire 2.5 sq mm"
@@ -149,7 +145,7 @@ export default function ItemForm({ item, onBack }) {
             <label className="block font-semibold text-slate-700 mb-1">Category</label>
             <input
               type="text"
-              disabled={!isAdmin}
+              disabled={!canEdit}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="e.g. Raw Materials"
@@ -160,7 +156,7 @@ export default function ItemForm({ item, onBack }) {
           <div>
             <label className="block font-semibold text-slate-700 mb-1">UQC (Standard Unit)</label>
             <select
-              disabled={!isAdmin}
+              disabled={!canEdit}
               value={uqc}
               onChange={(e) => setUqc(e.target.value)}
               className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 uppercase font-mono disabled:opacity-75"
@@ -183,7 +179,7 @@ export default function ItemForm({ item, onBack }) {
             type="number"
             step="0.01"
             min="0"
-            disabled={!isAdmin}
+            disabled={!canEdit}
             value={defaultRate}
             onChange={(e) => setDefaultRate(e.target.value)}
             placeholder="0.00"

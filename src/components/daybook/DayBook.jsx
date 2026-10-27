@@ -336,7 +336,7 @@ export default function DayBook({ onViewSale }) {
     }
 
     const rows = [
-      ['MU ACCOUNTS - DAY BOOK REGISTER'],
+      ['RS DESIGNS - DAY BOOK REGISTER'],
       [`Period: ${viewMode === 'daily' ? formatDate(selectedDate) : `${dateFrom} to ${dateTo}`} | Branch: ${branchFilter} | Dept: ${deptFilter}`],
       [],
       [
@@ -393,7 +393,7 @@ export default function DayBook({ onViewSale }) {
 
     if (viewMode === 'categorized') {
       const summaryRows = [
-        ['MU ACCOUNTS - CATEGORIZED INCOMES & EXPENSES LEDGER'],
+        ['RS DESIGNS - CATEGORIZED INCOMES & EXPENSES LEDGER'],
         [`Period: ${viewMode === 'daily' ? formatDate(selectedDate) : `${dateFrom} to ${dateTo}`} | Total Records: ${filteredEntries.length}`],
         [],
         ['PART A: INCOMES & RECEIPTS (CREDITS)'],
@@ -426,7 +426,7 @@ export default function DayBook({ onViewSale }) {
 
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Day Book Journal');
-    XLSX.writeFile(workbook, `MU_Accounts_DayBook_${viewMode === 'categorized' ? 'Categorized' : viewMode === 'daily' ? selectedDate : 'Range'}.xlsx`);
+    XLSX.writeFile(workbook, `RS_Designs_DayBook_${viewMode === 'categorized' ? 'Categorized' : viewMode === 'daily' ? selectedDate : 'Range'}.xlsx`);
     showToast(`Exported ${filteredEntries.length} records to Excel`, 'success');
   };
 

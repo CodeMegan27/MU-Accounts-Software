@@ -1,46 +1,37 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from '../config/firebase';
+import { db, BASE_COLLECTION_PATH } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getTenantCollectionPath, getActiveTenantId } from './DataContext';
 
 const SettingsContext = createContext(null);
 
 const DEFAULT_PROFILE = {
-  businessName: 'MU Accounts',
-  tagline: 'SMART CLOUD ACCOUNTING • INVENTORY & TAX ERP',
-  logoUrl: '/mu_accounts_logo.svg',
-  ownerName: 'Admin',
+  businessName: 'RS DESIGNS',
+  tagline: 'CREATIVE DESIGNING • DIGITAL PRINTING • FLEX BANNER & PACKAGING',
+  logoUrl: '/rs_designs_logo.jpg',
+  ownerName: 'Meganathan',
   gstin: '33BLQPM9171A1ZA',
   phone: '+91 98424 00000',
-  email: 'admin@muaccounts.com',
-  address: 'Commercial Complex, Main Road, Tamil Nadu - 623501',
+  email: 'rsdesigns@gmail.com',
+  address: 'Main Road, Ramanathapuram, Tamil Nadu - 623501',
   state: 'Tamil Nadu',
   stateCode: '33',
   bankName: 'State Bank of India',
   bankAccount: '33001234567',
   bankIfsc: 'SBIN0000908',
-  bankBranch: 'Main Branch',
+  bankBranch: 'Ramanathapuram Main Branch',
   invoiceNotes: 'Computer generated official tax invoice / order estimate.'
-};
-
-const getTenantProfileKey = () => {
-  const tid = getActiveTenantId();
-  return `rsp_${tid}_business_profile`;
 };
 
 export function SettingsProvider({ children }) {
   const [profile, setProfile] = useState(() => {
     try {
-      const key = getTenantProfileKey();
-      const saved = localStorage.getItem(key);
+      const saved = localStorage.getItem('rsp_business_profile');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.businessName === 'RS Purchase Enterprise' || parsed.businessName === 'RS DESIGNS' || !parsed.businessName) {
-          parsed.businessName = 'MU Accounts';
+        if (parsed.businessName === 'RS Purchase Enterprise' || !parsed.businessName) {
+          parsed.businessName = 'RS DESIGNS';
         }
-        if (!parsed.logoUrl || parsed.logoUrl === '/rs_designs_logo.jpg') {
-          parsed.logoUrl = '/mu_accounts_logo.svg';
-        }
+        if (!parsed.logoUrl) parsed.logoUrl = '/rs_designs_logo.jpg';
         return { ...DEFAULT_PROFILE, ...parsed };
       }
       return DEFAULT_PROFILE;
@@ -51,64 +42,40 @@ export function SettingsProvider({ children }) {
 
   const [loading, setLoading] = useState(true);
 
-  // Sync profile from Firestore for active tenant
-  const loadRemoteProfile = async () => {
-    if (!db) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const tenantPath = getTenantCollectionPath();
-      const ref = doc(db, tenantPath, 'settings', 'profile');
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        setProfile(prev => {
-          const merged = { ...prev, ...data };
-          localStorage.setItem(getTenantProfileKey(), JSON.stringify(merged));
-          return merged;
-        });
-      }
-    } catch (err) {
-      console.warn('Could not fetch remote profile, using local copy:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Sync profile from Firestore if available
   useEffect(() => {
-    loadRemoteProfile();
-
-    const handleTenantSwitch = (e) => {
-      const newTid = e?.detail?.tenantId || getActiveTenantId();
-      const newCoName = e?.detail?.companyName;
-      const key = `rsp_${newTid}_business_profile`;
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        try {
-          setProfile(JSON.parse(saved));
-        } catch (err) {}
-      } else {
-        setProfile({
-          ...DEFAULT_PROFILE,
-          businessName: newCoName || 'MU Accounts'
-        });
+    async function loadRemoteProfile() {
+      if (!db) {
+        setLoading(false);
+        return;
       }
-      loadRemoteProfile();
-    };
-
-    window.addEventListener('rsp_tenant_switched', handleTenantSwitch);
-    return () => window.removeEventListener('rsp_tenant_switched', handleTenantSwitch);
+      try {
+        const ref = doc(db, BASE_COLLECTION_PATH, 'settings', 'profile');
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          setProfile(prev => {
+            const merged = { ...prev, ...data };
+            localStorage.setItem('rsp_business_profile', JSON.stringify(merged));
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('Could not fetch remote profile, using local copy:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadRemoteProfile();
   }, []);
 
   const updateProfile = async (newProfile) => {
     setProfile(newProfile);
-    localStorage.setItem(getTenantProfileKey(), JSON.stringify(newProfile));
+    localStorage.setItem('rsp_business_profile', JSON.stringify(newProfile));
 
     if (db) {
       try {
-        const tenantPath = getTenantCollectionPath();
-        const ref = doc(db, tenantPath, 'settings', 'profile');
+        const ref = doc(db, BASE_COLLECTION_PATH, 'settings', 'profile');
         await setDoc(ref, newProfile, { merge: true });
         return { success: true };
       } catch (err) {

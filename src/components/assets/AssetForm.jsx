@@ -32,6 +32,7 @@ export default function AssetForm({ asset, onBack }) {
   const { showToast } = useToast();
 
   const isEditing = Boolean(asset);
+  const canEdit = !isEditing || isAdmin;
 
   // Form State
   const [name, setName] = useState('');
@@ -254,8 +255,8 @@ export default function AssetForm({ asset, onBack }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAdmin) {
-      showToast('Admin PIN required to record asset GST bills', 'error');
+    if (isEditing && !isAdmin) {
+      showToast('Admin PIN required to update existing asset bills', 'error');
       openLoginModal();
       return;
     }
@@ -362,15 +363,15 @@ export default function AssetForm({ asset, onBack }) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24">
-      {!isAdmin && (
+      {isEditing && !isAdmin && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-amber-900">Read-Only Guest Mode</h4>
-              <p className="text-[11px] text-amber-700">Admin PIN is required to record or edit Asset GST Bills.</p>
+              <h4 className="text-xs font-bold text-amber-900">Admin PIN Required to Edit</h4>
+              <p className="text-[11px] text-amber-700">Existing Asset GST Bills can only be updated with Admin Access.</p>
             </div>
           </div>
           <button
@@ -403,9 +404,9 @@ export default function AssetForm({ asset, onBack }) {
           <button
             type="submit"
             form="assetGstForm"
-            disabled={!isAdmin || isSaving}
+            disabled={!canEdit || isSaving}
             className={`flex items-center gap-1.5 px-6 py-2 rounded-xl text-xs font-bold shadow-md transition-all ${
-              !isAdmin ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/20'
+              !canEdit ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/20'
             }`}
           >
             <Check className="w-4 h-4" /> {isSaving ? 'Saving...' : isEditing ? 'Update Asset Bill' : 'Save Asset Bill'}
@@ -439,7 +440,7 @@ export default function AssetForm({ asset, onBack }) {
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
                 placeholder="e.g. INV-2026/901"
@@ -454,7 +455,7 @@ export default function AssetForm({ asset, onBack }) {
               <input
                 type="date"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -464,7 +465,7 @@ export default function AssetForm({ asset, onBack }) {
             <div>
               <label className="block font-bold text-slate-700 mb-1">Branch</label>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -478,7 +479,7 @@ export default function AssetForm({ asset, onBack }) {
             <div>
               <label className="block font-bold text-slate-700 mb-1">Department</label>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -505,7 +506,7 @@ export default function AssetForm({ asset, onBack }) {
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Choose Existing Vendor</label>
                 <select
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={vendorId}
                   onChange={(e) => handleSelectVendor(e.target.value)}
                   className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
@@ -523,7 +524,7 @@ export default function AssetForm({ asset, onBack }) {
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">Vendor / Payee Name</label>
                 <input
                   type="text"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={vendorName}
                   onChange={(e) => setVendorName(e.target.value)}
                   placeholder="e.g. Heidelberg India Pvt Ltd"
@@ -537,7 +538,7 @@ export default function AssetForm({ asset, onBack }) {
                 </label>
                 <input
                   type="text"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   maxLength={15}
                   value={vendorGstin}
                   onChange={(e) => {
@@ -557,7 +558,7 @@ export default function AssetForm({ asset, onBack }) {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   checked={isInterState}
                   onChange={(e) => setIsInterState(e.target.checked)}
                   className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4"
@@ -587,7 +588,7 @@ export default function AssetForm({ asset, onBack }) {
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Heidelberg SM 74 4-Color Printing Press"
@@ -598,7 +599,7 @@ export default function AssetForm({ asset, onBack }) {
             <div>
               <label className="block font-bold text-slate-700 mb-1">Asset Category</label>
               <select
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-medium"
@@ -618,7 +619,7 @@ export default function AssetForm({ asset, onBack }) {
               <label className="block font-bold text-slate-700 mb-1">HSN / SAC Code</label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={hsn}
                 onChange={(e) => setHsn(e.target.value)}
                 placeholder="e.g. 8443 (Machinery) or 8471"
@@ -633,13 +634,13 @@ export default function AssetForm({ asset, onBack }) {
                   type="number"
                   min="1"
                   step="1"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
                   className="w-20 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-center font-bold"
                 />
                 <select
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={uqc}
                   onChange={(e) => setUqc(e.target.value)}
                   className="flex-1 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none font-medium"
@@ -656,7 +657,7 @@ export default function AssetForm({ asset, onBack }) {
               <label className="block font-bold text-slate-700 mb-1">Location / Shop Floor</label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. Press Shop Bay 2"
@@ -682,7 +683,7 @@ export default function AssetForm({ asset, onBack }) {
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
                 <button
                   type="button"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   onClick={() => setTaxType('exclusive')}
                   className={`px-2.5 py-1 rounded-lg transition-all ${
                     taxType === 'exclusive' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -692,7 +693,7 @@ export default function AssetForm({ asset, onBack }) {
                 </button>
                 <button
                   type="button"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   onClick={() => setTaxType('inclusive')}
                   className={`px-2.5 py-1 rounded-lg transition-all ${
                     taxType === 'inclusive' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -705,7 +706,7 @@ export default function AssetForm({ asset, onBack }) {
               <label className="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
                 <input
                   type="checkbox"
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   checked={isGst}
                   onChange={(e) => setIsGst(e.target.checked)}
                   className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4"
@@ -725,7 +726,7 @@ export default function AssetForm({ asset, onBack }) {
                 step="0.01"
                 min="0"
                 required
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={taxableAmount}
                 onChange={(e) => setTaxableAmount(e.target.value)}
                 placeholder="0.00"
@@ -741,7 +742,7 @@ export default function AssetForm({ asset, onBack }) {
                 <label className="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer">
                   <input
                     type="checkbox"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     checked={gstOnTransport}
                     onChange={(e) => setGstOnTransport(e.target.checked)}
                     className="rounded text-brand-600 w-3 h-3"
@@ -753,7 +754,7 @@ export default function AssetForm({ asset, onBack }) {
                 type="number"
                 step="0.01"
                 min="0"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={transportCharges}
                 onChange={(e) => setTransportCharges(e.target.value)}
                 placeholder="0.00"
@@ -769,7 +770,7 @@ export default function AssetForm({ asset, onBack }) {
                 type="number"
                 step="0.01"
                 min="0"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder="0.00"
@@ -785,7 +786,7 @@ export default function AssetForm({ asset, onBack }) {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     checked={isRoundOff}
                     onChange={(e) => setIsRoundOff(e.target.checked)}
                     className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4"
@@ -804,7 +805,7 @@ export default function AssetForm({ asset, onBack }) {
               <div>
                 <label className="block font-bold text-slate-700 mb-1">GST Tax Rate</label>
                 <select
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={taxRate}
                   onChange={(e) => setTaxRate(Number(e.target.value))}
                   className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-bold"
@@ -820,7 +821,7 @@ export default function AssetForm({ asset, onBack }) {
               <div>
                 <label className="block font-bold text-slate-700 mb-1">GSTR-2B ITC Eligibility</label>
                 <select
-                  disabled={!isAdmin}
+                  disabled={!canEdit}
                   value={itcEligibility}
                   onChange={(e) => setItcEligibility(e.target.value)}
                   className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-semibold text-purple-900"
@@ -919,7 +920,7 @@ export default function AssetForm({ asset, onBack }) {
             <div className="flex gap-2 bg-slate-100 p-1 rounded-xl text-xs font-bold">
               <button
                 type="button"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 onClick={() => {
                   setPaymentOption('paid');
                   setPaidAmount(String(calculations.grandTotal));
@@ -932,7 +933,7 @@ export default function AssetForm({ asset, onBack }) {
               </button>
               <button
                 type="button"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 onClick={() => {
                   setPaymentOption('partial');
                   if (!paidAmount || parseFloat(paidAmount) === calculations.grandTotal || parseFloat(paidAmount) === 0) {
@@ -947,7 +948,7 @@ export default function AssetForm({ asset, onBack }) {
               </button>
               <button
                 type="button"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 onClick={() => {
                   setPaymentOption('unpaid');
                   setPaidAmount('0');
@@ -968,7 +969,7 @@ export default function AssetForm({ asset, onBack }) {
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     onClick={() => {
                       setPaidAmount(String(calculations.grandTotal));
                       setPaymentOption('paid');
@@ -979,7 +980,7 @@ export default function AssetForm({ asset, onBack }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     onClick={() => {
                       setPaidAmount(String((calculations.grandTotal / 2).toFixed(2)));
                       setPaymentOption('partial');
@@ -990,7 +991,7 @@ export default function AssetForm({ asset, onBack }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!isAdmin}
+                    disabled={!canEdit}
                     onClick={() => {
                       setPaidAmount('0');
                       setPaymentOption('unpaid');
@@ -1005,7 +1006,7 @@ export default function AssetForm({ asset, onBack }) {
                 type="number"
                 step="0.01"
                 min="0"
-                disabled={!isAdmin}
+                disabled={!canEdit}
                 value={paidAmount}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -1032,7 +1033,7 @@ export default function AssetForm({ asset, onBack }) {
             <div>
               <label className="block font-bold text-slate-700 mb-1">Payment Method / Bank</label>
               <select
-                disabled={!isAdmin || (parseFloat(paidAmount) || 0) <= 0}
+                disabled={!canEdit || (parseFloat(paidAmount) || 0) <= 0}
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-medium disabled:opacity-50"
@@ -1047,7 +1048,7 @@ export default function AssetForm({ asset, onBack }) {
               <label className="block font-bold text-slate-700 mb-1">Payment Ref / Cheque / UTR</label>
               <input
                 type="text"
-                disabled={!isAdmin || (parseFloat(paidAmount) || 0) <= 0}
+                disabled={!canEdit || (parseFloat(paidAmount) || 0) <= 0}
                 value={paymentRef}
                 onChange={(e) => setPaymentRef(e.target.value)}
                 placeholder="e.g. UTR-982104 or Chq #4410"
@@ -1073,7 +1074,7 @@ export default function AssetForm({ asset, onBack }) {
             <label className="block font-semibold text-slate-700 mb-1">Remarks / Warranty / Serial Numbers</label>
             <input
               type="text"
-              disabled={!isAdmin}
+              disabled={!canEdit}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Machine Sr. No: HD-2026-X, 2 Years Comprehensive Warranty"

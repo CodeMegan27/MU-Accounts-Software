@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
-import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -31,10 +30,7 @@ import {
   Phone,
   AlertTriangle,
   Calendar,
-  CreditCard,
-  Lock,
-  Crown,
-  Layers
+  CreditCard
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Bar, Doughnut } from 'react-chartjs-2';
@@ -59,18 +55,21 @@ ChartJS.register(
   Legend
 );
 
-export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, onViewSale, onRecordPayment }) {
-  const { bills = [], vendors = [], expenses = [], sales = [], branches = [], departments = [] } = useData();
-  const { currentTier, tierConfig, isDeveloper } = useAuth();
+export default function Dashboard({ 
+  onNavigate, 
+  onViewBill, 
+  onOpenCreateBill, 
+  onViewSale, 
+  onRecordPayment,
+  onOpenVendorLedger,
+  onOpenPaymentModal 
+}) {
+  const { bills, vendors, expenses, sales } = useData();
   const { profile } = useSettings();
   const { showToast } = useToast();
   const [showVendorPrintModal, setShowVendorPrintModal] = useState(false);
   const pieChartRef = useRef(null);
   const salesPieChartRef = useRef(null);
-
-  // Dynamic Multi-Branch & Department Filters
-  const [selectedBranch, setSelectedBranch] = useState('ALL');
-  const [selectedDept, setSelectedDept] = useState('ALL');
 
   // Monthwise Filter for Vendor Spending Distribution
   const [vendorMonthFilter, setVendorMonthFilter] = useState('ALL');
@@ -79,29 +78,6 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
   const [salesMonthFilter, setSalesMonthFilter] = useState('ALL');
   const [salesDimension, setSalesDimension] = useState('branch'); // 'branch' or 'department'
 
-  // Filtered Collections based on selectedBranch and selectedDept
-  const branchFilteredSales = useMemo(() => {
-    return (sales || []).filter(s => {
-      if (selectedBranch !== 'ALL' && (s.branch || 'KLK').toUpperCase() !== selectedBranch.toUpperCase()) return false;
-      if (selectedDept !== 'ALL' && (s.department || '').toUpperCase() !== selectedDept.toUpperCase()) return false;
-      return true;
-    });
-  }, [sales, selectedBranch, selectedDept]);
-
-  const branchFilteredBills = useMemo(() => {
-    return (bills || []).filter(b => {
-      if (selectedBranch !== 'ALL' && (b.branch || 'KLK').toUpperCase() !== selectedBranch.toUpperCase()) return false;
-      if (selectedDept !== 'ALL' && (b.department || '').toUpperCase() !== selectedDept.toUpperCase()) return false;
-      return true;
-    });
-  }, [bills, selectedBranch, selectedDept]);
-
-  const branchFilteredExpenses = useMemo(() => {
-    return (expenses || []).filter(e => {
-      if (selectedBranch !== 'ALL' && (e.branch || 'KLK').toUpperCase() !== selectedBranch.toUpperCase()) return false;
-      return true;
-    });
-  }, [expenses, selectedBranch]);
 
   // Accounts Receivable (Customer Pending Balances) State
   const [receivableSearch, setReceivableSearch] = useState('');
@@ -112,7 +88,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
 
   // Customer Receivables calculation (Outstanding balances from sales/estimates)
   const receivablesData = useMemo(() => {
-    if (!branchFilteredSales || !Array.isArray(branchFilteredSales)) {
+    if (!sales || !Array.isArray(sales)) {
       return { 
         list: [], 
         totalReceivable: 0, 
@@ -137,7 +113,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     let g714Count = 0;
     let lt7Count = 0;
 
-    const list = branchFilteredSales
+    const list = sales
       .filter(s => {
         const bal = parseFloat(s.balanceAmount);
         return !isNaN(bal) && bal > 0.01;
@@ -200,7 +176,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
       g714Count,
       lt7Count
     };
-  }, [branchFilteredSales]);
+  }, [sales]);
 
   // Filtered & Sorted Receivables
   const filteredReceivables = useMemo(() => {
@@ -286,6 +262,214 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     }
   };
 
+  // Accounts Payable (Vendor Unpaid Invoices) State
+  const [payableSearch, setPayableSearch] = useState('');
+  const [payableAgingFilter, setPayableAgingFilter] = useState('all'); // 'all', 'gt60', '31_60', '15_30', 'lt15'
+  const [payableSort, setPayableSort] = useState('balance_desc'); // 'balance_desc', 'days_desc', 'name_asc'
+  const [payablePage, setPayablePage] = useState(1);
+  const payablePageSize = 10;
+
+  // Vendor Payables calculation
+  const vendorPayablesData = useMemo(() => {
+    if (!bills || !Array.isArray(bills)) {
+      return { 
+        list: [], 
+        totalPayable: 0, 
+        vendorCount: 0, 
+        urgentCount: 0, 
+        urgentAmount: 0, 
+        avgDays: 0,
+        buckets: {
+          gt60: { count: 0, amount: 0 },
+          g3160: { count: 0, amount: 0 },
+          g1530: { count: 0, amount: 0 },
+          lt15: { count: 0, amount: 0 }
+        }
+      };
+    }
+
+    const now = new Date();
+    const vendorMap = {};
+
+    bills.forEach(b => {
+      if (!b) return;
+      const gTotal = parseFloat(b.grandTotal) || 0;
+      const pAmt = parseFloat(b.paidAmount) || 0;
+      const bal = b.balanceAmount !== undefined ? parseFloat(b.balanceAmount) : Math.max(0, gTotal - pAmt);
+      if (bal <= 0.01) return;
+
+      const vId = b.vendorId || b.vendorName || 'Unknown Vendor';
+      const vName = b.vendorName || 'Unknown Vendor';
+
+      let daysPending = 0;
+      const bDateStr = b.date || b.billDate || '';
+      if (bDateStr) {
+        const bDate = new Date(bDateStr);
+        if (!isNaN(bDate.getTime())) {
+          const diffMs = now.getTime() - bDate.getTime();
+          daysPending = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      if (!vendorMap[vId]) {
+        const vendorObj = (vendors || []).find(v => v.id === b.vendorId || v.name === b.vendorName) || {};
+        vendorMap[vId] = {
+          vendorId: vId,
+          vendorName: vName,
+          phone: vendorObj.phone || vendorObj.mobile || vendorObj.contact || '',
+          gstin: vendorObj.gstin || b.vendorGstin || '',
+          rawVendor: vendorObj.id ? vendorObj : { id: vId, name: vName, phone: vendorObj.phone || '', gstin: b.vendorGstin || '' },
+          totalBilled: 0,
+          totalPaid: 0,
+          balanceDue: 0,
+          unpaidBillsCount: 0,
+          maxDaysPending: 0,
+          urgentBillsCount: 0,
+          urgentAmount: 0,
+          unpaidBills: []
+        };
+      }
+
+      const vm = vendorMap[vId];
+      vm.totalBilled += gTotal;
+      vm.totalPaid += pAmt;
+      vm.balanceDue += bal;
+      vm.unpaidBillsCount += 1;
+      vm.unpaidBills.push(b);
+
+      if (daysPending > vm.maxDaysPending) {
+        vm.maxDaysPending = daysPending;
+      }
+
+      if (daysPending >= 31) {
+        vm.urgentBillsCount += 1;
+        vm.urgentAmount += bal;
+      }
+    });
+
+    const list = Object.values(vendorMap);
+    let totalPayable = 0;
+    let gt60Amount = 0, g3160Amount = 0, g1530Amount = 0, lt15Amount = 0;
+    let gt60Count = 0, g3160Count = 0, g1530Count = 0, lt15Count = 0;
+    let totalDays = 0;
+    let totalUrgentVendors = 0;
+    let totalUrgentAmount = 0;
+
+    list.forEach(v => {
+      totalPayable += v.balanceDue;
+      totalDays += v.maxDaysPending;
+      if (v.urgentBillsCount > 0) {
+        totalUrgentVendors += 1;
+        totalUrgentAmount += v.balanceDue;
+      }
+
+      if (v.maxDaysPending >= 61) {
+        gt60Amount += v.balanceDue;
+        gt60Count += 1;
+      } else if (v.maxDaysPending >= 31) {
+        g3160Amount += v.balanceDue;
+        g3160Count += 1;
+      } else if (v.maxDaysPending >= 15) {
+        g1530Amount += v.balanceDue;
+        g1530Count += 1;
+      } else {
+        lt15Amount += v.balanceDue;
+        lt15Count += 1;
+      }
+    });
+
+    const avgDays = list.length > 0 ? Math.round(totalDays / list.length) : 0;
+
+    return {
+      list,
+      totalPayable,
+      vendorCount: list.length,
+      urgentCount: totalUrgentVendors,
+      urgentAmount: totalUrgentAmount,
+      avgDays,
+      buckets: {
+        gt60: { count: gt60Count, amount: gt60Amount },
+        g3160: { count: g3160Count, amount: g3160Amount },
+        g1530: { count: g1530Count, amount: g1530Amount },
+        lt15: { count: lt15Count, amount: lt15Amount }
+      }
+    };
+  }, [bills, vendors]);
+
+  // Filtered & Sorted Payables
+  const filteredPayables = useMemo(() => {
+    let result = [...vendorPayablesData.list];
+
+    if (payableSearch.trim()) {
+      const q = payableSearch.toLowerCase().trim();
+      result = result.filter(v => 
+        (v.vendorName && v.vendorName.toLowerCase().includes(q)) ||
+        (v.phone && String(v.phone).includes(q)) ||
+        (v.gstin && v.gstin.toLowerCase().includes(q))
+      );
+    }
+
+    if (payableAgingFilter === 'gt60') {
+      result = result.filter(v => v.maxDaysPending >= 61);
+    } else if (payableAgingFilter === '31_60') {
+      result = result.filter(v => v.maxDaysPending >= 31 && v.maxDaysPending <= 60);
+    } else if (payableAgingFilter === '15_30') {
+      result = result.filter(v => v.maxDaysPending >= 15 && v.maxDaysPending <= 30);
+    } else if (payableAgingFilter === 'lt15') {
+      result = result.filter(v => v.maxDaysPending < 15);
+    }
+
+    result.sort((a, b) => {
+      if (payableSort === 'balance_desc') return b.balanceDue - a.balanceDue;
+      if (payableSort === 'days_desc') return b.maxDaysPending - a.maxDaysPending;
+      if (payableSort === 'name_asc') return (a.vendorName || '').localeCompare(b.vendorName || '');
+      return 0;
+    });
+
+    return result;
+  }, [vendorPayablesData.list, payableSearch, payableAgingFilter, payableSort]);
+
+  const totalPayablePages = Math.max(1, Math.ceil(filteredPayables.length / payablePageSize));
+  const paginatedPayables = useMemo(() => {
+    const start = (payablePage - 1) * payablePageSize;
+    return filteredPayables.slice(start, start + payablePageSize);
+  }, [filteredPayables, payablePage, payablePageSize]);
+
+  useEffect(() => {
+    setPayablePage(1);
+  }, [payableSearch, payableAgingFilter, payableSort]);
+
+  const handleExportPayablesExcel = () => {
+    if (filteredPayables.length === 0) {
+      showToast('No payable records to export', 'error');
+      return;
+    }
+    try {
+      const rows = filteredPayables.map((v, i) => ({
+        'S.No': i + 1,
+        'Vendor Name': v.vendorName,
+        'Mobile Number': v.phone || 'N/A',
+        'GSTIN': v.gstin || 'N/A',
+        'Unpaid Invoices': v.unpaidBillsCount,
+        'Max Days Pending': v.maxDaysPending,
+        'Aging Category': v.maxDaysPending >= 61 ? '> 60 Days (Critical)' : v.maxDaysPending >= 31 ? '31-60 Days' : v.maxDaysPending >= 15 ? '15-30 Days' : '< 15 Days',
+        'Urgent Invoices (>30d)': v.urgentBillsCount,
+        'Total Billed (₹)': v.totalBilled,
+        'Total Paid (₹)': v.totalPaid,
+        'Outstanding Balance (₹)': v.balanceDue
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Vendor_Payables');
+      XLSX.writeFile(wb, `Accounts_Payable_Ageing_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast(`Exported ${filteredPayables.length} vendor payable records to Excel`, 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to export payables', 'error');
+    }
+  };
+
   // Close print modal on Escape key press
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -307,7 +491,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     const vendorMap = {};
     const monthlyMap = {};
 
-    branchFilteredBills.forEach(bill => {
+    bills.forEach(bill => {
       const gTotal = parseFloat(bill.grandTotal) || 0;
       const pAmt = parseFloat(bill.paidAmount) || 0;
       const bal = bill.balanceAmount !== undefined ? parseFloat(bill.balanceAmount) : (gTotal - pAmt);
@@ -329,7 +513,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     });
 
     let totalExpenses = 0;
-    branchFilteredExpenses.forEach(e => {
+    expenses.forEach(e => {
       totalExpenses += (parseFloat(e.amount) || 0);
     });
 
@@ -347,9 +531,9 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
       vendorCount: vendors.length,
       monthlyMap,
       topVendors,
-      recentBills: branchFilteredBills.slice(0, 5)
+      recentBills: bills.slice(0, 5)
     };
-  }, [branchFilteredBills, vendors, branchFilteredExpenses]);
+  }, [bills, vendors, expenses]);
 
   // Chart Configuration for Monthly Bar Chart
   const chartData = useMemo(() => {
@@ -403,25 +587,25 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
   // Available Month Keys for Purchases
   const availablePurchaseMonths = useMemo(() => {
     const monthsSet = new Set();
-    branchFilteredBills.forEach(b => {
+    bills.forEach(b => {
       if (b.date && typeof b.date === 'string' && b.date.length >= 7) {
         monthsSet.add(b.date.substring(0, 7));
       }
     });
     return Array.from(monthsSet).sort().reverse();
-  }, [branchFilteredBills]);
+  }, [bills]);
 
   // Available Month Keys for Sales
   const availableSalesMonths = useMemo(() => {
     const monthsSet = new Set();
-    branchFilteredSales.forEach(s => {
+    sales.forEach(s => {
       const d = s.orderDate || s.invDate || s.date;
       if (d && typeof d === 'string' && d.length >= 7) {
         monthsSet.add(d.substring(0, 7));
       }
     });
     return Array.from(monthsSet).sort().reverse();
-  }, [branchFilteredSales]);
+  }, [sales]);
 
   // Vendor Spend Distribution for Doughnut / Pie Chart (Filtered by Month)
   const vendorDistribution = useMemo(() => {
@@ -429,8 +613,8 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     const vendorMap = {};
 
     const filteredBills = vendorMonthFilter === 'ALL'
-      ? branchFilteredBills
-      : branchFilteredBills.filter(b => b.date && typeof b.date === 'string' && b.date.startsWith(vendorMonthFilter));
+      ? bills
+      : bills.filter(b => b.date && typeof b.date === 'string' && b.date.startsWith(vendorMonthFilter));
 
     filteredBills.forEach(bill => {
       const gTotal = parseFloat(bill.grandTotal) || 0;
@@ -498,7 +682,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
         ]
       }
     };
-  }, [branchFilteredBills, vendorMonthFilter]);
+  }, [bills, vendorMonthFilter]);
 
   // Sales Distribution Pie Chart (Branchwise & Departmentwise + Monthwise Filtered)
   const salesDistribution = useMemo(() => {
@@ -506,8 +690,8 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
     const groupMap = {};
 
     const filteredSales = salesMonthFilter === 'ALL'
-      ? branchFilteredSales
-      : branchFilteredSales.filter(s => {
+      ? sales
+      : sales.filter(s => {
           const d = s.orderDate || s.invDate || s.date;
           return d && typeof d === 'string' && d.startsWith(salesMonthFilter);
         });
@@ -584,7 +768,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
         ]
       }
     };
-  }, [branchFilteredSales, salesMonthFilter, salesDimension]);
+  }, [sales, salesMonthFilter, salesDimension]);
 
 
   const pieOptions = {
@@ -853,138 +1037,114 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
         </div>
       </div>
 
-      {/* Quick Multi-Branch & Department Filter Toolbar */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <Filter className="w-4 h-4 text-brand-600" />
-            <span>Filter Analytics:</span>
-          </div>
-
-          {/* Branch Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs">
-            <Building2 className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[11px] font-semibold text-slate-500">Branch:</span>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">All Branches ({branches.length || 2})</option>
-              {branches.map(b => (
-                <option key={b} value={b}>{b} Branch</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Department Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs">
-            <Layers className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[11px] font-semibold text-slate-500">Dept:</span>
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">All Departments ({departments.length || 7})</option>
-              {departments.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          {(selectedBranch !== 'ALL' || selectedDept !== 'ALL') && (
-            <button
-              onClick={() => { setSelectedBranch('ALL'); setSelectedDept('ALL'); }}
-              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-            currentTier === 'premium' ? 'bg-emerald-100 text-emerald-800' :
-            currentTier === 'pro' ? 'bg-indigo-100 text-indigo-800' :
-            currentTier === 'basic' ? 'bg-blue-100 text-blue-800' :
-            'bg-slate-100 text-slate-800'
-          }`}>
-            {tierConfig?.badge || 'Plan Tier'}
-          </span>
-          {isDeveloper && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-              Developer Bypass Active
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {/* Total Purchases YTD */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div 
+          onClick={() => onNavigate && onNavigate('bills')}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all group"
+          title="Click to view all purchase bills"
+        >
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Purchases</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-brand-600 transition-colors">Total Purchases</p>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{formatCurrency(stats.totalPurchases)}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">{bills.length} bills recorded</p>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <span>{bills.length} bills recorded</span>
+              <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-brand-500 transition-colors" />
+            </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-brand-600 flex items-center justify-center border border-blue-100 flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-brand-600 flex items-center justify-center border border-blue-100 flex-shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-all">
             <ShoppingCart className="w-6 h-6" />
           </div>
         </div>
 
         {/* Outstanding Payables */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div 
+          onClick={() => onNavigate && onNavigate('payables')}
+          className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all group bg-gradient-to-br from-white to-amber-50/30"
+          title="Click to view Accounts Payable & Aging Register"
+        >
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding Payables</p>
-            <h3 className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{formatCurrency(stats.totalOutstanding)}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">Pending to vendors</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider group-hover:text-amber-800 transition-colors">Outstanding Payables</p>
+              {vendorPayablesData.urgentCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Has invoices pending > 30 days" />
+              )}
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-amber-600 mt-1">{formatCurrency(vendorPayablesData.totalPayable)}</h3>
+            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+              <span className="font-semibold text-amber-700">{vendorPayablesData.vendorCount}</span> vendors to repay
+              {vendorPayablesData.urgentCount > 0 && (
+                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1 rounded ml-1">
+                  {vendorPayablesData.urgentCount} urgent
+                </span>
+              )}
+              <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-amber-600 ml-auto transition-colors" />
+            </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 flex-shrink-0">
-            <AlertCircle className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 flex-shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-all">
+            <CreditCard className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Customer Receivables (NEW) */}
-        <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-white to-rose-50/30 shadow-sm flex items-center justify-between">
+        {/* Customer Receivables */}
+        <div 
+          onClick={() => onNavigate && onNavigate('receivables')}
+          className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-white to-rose-50/30 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all group"
+          title="Click to view Customer Receivables & Aging Register"
+        >
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider">Customer Receivables</p>
+              <p className="text-xs font-semibold text-rose-600 uppercase tracking-wider group-hover:text-rose-700 transition-colors">Customer Receivables</p>
               {receivablesData.criticalCount > 0 && (
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Has orders pending > 25 days" />
               )}
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-rose-600 mt-1">{formatCurrency(receivablesData.totalReceivable)}</h3>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
               <span className="font-semibold text-rose-700">{receivablesData.count}</span> clients pending
+              <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-rose-600 ml-auto transition-colors" />
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 flex-shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-all">
             <ArrowDownLeft className="w-6 h-6" />
           </div>
         </div>
 
         {/* Total Expenses */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div 
+          onClick={() => onNavigate && onNavigate('expenses')}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all group"
+          title="Click to view Expenses register"
+        >
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Expenses</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-purple-600 transition-colors">Total Expenses</p>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{formatCurrency(stats.totalExpenses)}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">{expenses.length} expenses logged</p>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <span>{expenses.length} expenses logged</span>
+              <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-purple-500 transition-colors" />
+            </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 flex-shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-all">
             <Receipt className="w-6 h-6" />
           </div>
         </div>
 
         {/* Active Vendors */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div 
+          onClick={() => onNavigate && onNavigate('vendors')}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all group"
+          title="Click to view Vendors Directory"
+        >
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Vendors</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider group-hover:text-emerald-600 transition-colors">Active Vendors</p>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.vendorCount}</h3>
-            <p className="text-[11px] text-slate-400 mt-1">Suppliers registered</p>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <span>Suppliers registered</span>
+              <ArrowUpRight className="w-3 h-3 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+            </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 flex-shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-all">
             <Users className="w-6 h-6" />
           </div>
         </div>
@@ -1048,43 +1208,16 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
         </div>
       </div>
 
-      {/* Distribution Analytics (Pie Charts) - Tier Gated for Pro & Premium */}
-      {!tierConfig?.hasPieChart ? (
-        <div className="bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-8 rounded-3xl border border-indigo-200/80 shadow-sm text-center space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto shadow-inner">
-            <PieChartIcon className="w-8 h-8" />
+      {/* Vendor Spending Breakdown Section with Doughnut / Pie Chart */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <PieChartIcon className="w-5 h-5 text-brand-600" />
+              <h3 className="text-base font-bold text-slate-900">Vendor Spending Distribution</h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">Proportional procurement spend breakdown by supplier</p>
           </div>
-          <div className="max-w-md mx-auto space-y-1.5">
-            <span className="px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800">
-              Distribution Analytics Locked on {tierConfig?.name || 'Free Trial'}
-            </span>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">
-              Supplier & Sales Pie Chart Distribution
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Interactive 360° slices with arrow pointers, supplier share breakdowns, and branch vs department turnover distribution are unlocked on <strong>Pro Business</strong> and <strong>Premium Enterprise</strong> plans.
-            </p>
-          </div>
-          <button
-            onClick={() => onNavigate('profile')}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <Crown className="w-4 h-4 text-amber-300" />
-            <span>Upgrade Plan in Profile Settings</span>
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Vendor Spending Breakdown Section with Doughnut / Pie Chart */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <PieChartIcon className="w-5 h-5 text-brand-600" />
-                  <h3 className="text-base font-bold text-slate-900">Vendor Spending Distribution</h3>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">Proportional procurement spend breakdown by supplier</p>
-              </div>
 
           {/* Monthwise Filter & Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1333,8 +1466,7 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
           </div>
         </div>
       </div>
-    </>
-  )}
+
 
       {/* Customer Accounts Receivable (Pending Payments from Clients) Table Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1691,96 +1823,422 @@ export default function Dashboard({ onNavigate, onViewBill, onOpenCreateBill, on
         )}
       </div>
 
-      {/* Recent Bills Activity Table (Tier Gated: Basic, Pro & Premium) */}
-      {!tierConfig?.hasRecentBills ? (
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center mx-auto">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div className="max-w-md mx-auto space-y-1">
-            <h4 className="text-sm font-bold text-slate-900">Recent Purchase Bills Stream Locked</h4>
-            <p className="text-xs text-slate-500">
-              Live recent bills activity stream is available on Basic, Pro, and Premium plans.
-            </p>
-          </div>
-          <button
-            onClick={() => onNavigate('profile')}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-300" />
-            <span>Upgrade to Basic Plan</span>
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Recent Purchase Bills</h3>
-              <p className="text-xs text-slate-400">Latest supplier invoices recorded in the system</p>
+      {/* Vendor Accounts Payable & Ageing Section */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Header Strip */}
+        <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-amber-50/40 via-white to-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center border border-amber-200 flex-shrink-0">
+              <CreditCard className="w-5 h-5" />
             </div>
-            <button
-              onClick={() => onNavigate('bills')}
-              className="text-xs font-semibold text-brand-600 hover:text-brand-800 flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm transition-colors"
-            >
-              All Bills <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">Vendor Accounts Payable & Ageing</h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  {vendorPayablesData.vendorCount} Vendors to Repay
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Outstanding balances owed to suppliers with aging days tracker & urgent invoice prioritization
+              </p>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase font-semibold tracking-wider">
-                  <th className="px-6 py-3.5">Date</th>
-                  <th className="px-6 py-3.5">Invoice #</th>
-                  <th className="px-6 py-3.5">Vendor</th>
-                  <th className="px-6 py-3.5 text-right">Amount</th>
-                  <th className="px-6 py-3.5 text-center">Status</th>
-                  <th className="px-6 py-3.5 text-center w-20">Action</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-slate-100 text-slate-700">
-                {stats.recentBills.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="text-center py-8 text-slate-400">
-                      No purchase bills entered yet.
-                    </td>
-                  </tr>
-                ) : (
-                  stats.recentBills.map(b => (
-                    <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-3.5 text-slate-600 text-xs">{formatDate(b.date)}</td>
-                      <td className="px-6 py-3.5 font-bold text-slate-900">{b.invoiceNo || 'N/A'}</td>
-                      <td className="px-6 py-3.5 font-medium text-slate-800">{b.vendorName || 'N/A'}</td>
-                      <td className="px-6 py-3.5 text-right font-bold text-slate-900">{formatCurrency(b.grandTotal)}</td>
-                      <td className="px-6 py-3.5 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          b.paymentStatus === 'paid'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : b.paymentStatus === 'partial'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {b.paymentStatus === 'paid' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                          {b.paymentStatus ? b.paymentStatus.toUpperCase() : 'UNPAID'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-center">
-                        <button
-                          onClick={() => onViewBill(b.id)}
-                          className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="View Tax Invoice"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          {/* Quick Metrics & Actions */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="hidden lg:flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs text-xs">
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Total Payable</span>
+                <span className="font-bold text-amber-600">{formatCurrency(vendorPayablesData.totalPayable)}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">&gt; 30 Days Urgent</span>
+                <span className="font-bold text-amber-700">{vendorPayablesData.urgentCount} vendors ({formatCurrency(vendorPayablesData.urgentAmount)})</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Avg Aging</span>
+                <span className="font-bold text-slate-700">{vendorPayablesData.avgDays} days</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExportPayablesExcel}
+              disabled={filteredPayables.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold transition-colors border border-emerald-200 shadow-xs disabled:opacity-50"
+              title="Export Vendor Payables to Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Export Excel</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('payables')}
+              className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex items-center gap-1 bg-white hover:bg-amber-50/50 border border-amber-200 px-3 py-1.5 rounded-xl shadow-xs transition-colors"
+            >
+              <span>Full Payables Register</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Filters & Search Toolbar */}
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={payableSearch}
+              onChange={(e) => setPayableSearch(e.target.value)}
+              placeholder="Search vendor name, phone, GSTIN..."
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 placeholder:text-slate-400"
+            />
+            {payableSearch && (
+              <button
+                onClick={() => setPayableSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Aging Filters & Sort */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Pills */}
+            <div className="flex items-center p-0.5 bg-slate-200/70 rounded-xl text-xs font-medium text-slate-600">
+              <button
+                onClick={() => setPayableAgingFilter('all')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  payableAgingFilter === 'all'
+                    ? 'bg-white text-slate-900 font-bold shadow-xs'
+                    : 'hover:text-slate-900'
+                }`}
+              >
+                All ({vendorPayablesData.vendorCount})
+              </button>
+              <button
+                onClick={() => setPayableAgingFilter('gt60')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  payableAgingFilter === 'gt60'
+                    ? 'bg-rose-600 text-white font-bold shadow-xs'
+                    : 'text-rose-700 hover:text-rose-900'
+                }`}
+              >
+                &gt; 60 Days ({vendorPayablesData.buckets.gt60.count})
+              </button>
+              <button
+                onClick={() => setPayableAgingFilter('31_60')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  payableAgingFilter === '31_60'
+                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    : 'text-amber-700 hover:text-amber-900'
+                }`}
+              >
+                31-60 Days ({vendorPayablesData.buckets.g3160.count})
+              </button>
+              <button
+                onClick={() => setPayableAgingFilter('15_30')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  payableAgingFilter === '15_30'
+                    ? 'bg-blue-600 text-white font-bold shadow-xs'
+                    : 'text-blue-700 hover:text-blue-900'
+                }`}
+              >
+                15-30 Days ({vendorPayablesData.buckets.g1530.count})
+              </button>
+              <button
+                onClick={() => setPayableAgingFilter('lt15')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  payableAgingFilter === 'lt15'
+                    ? 'bg-slate-700 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                &lt; 15 Days ({vendorPayablesData.buckets.lt15.count})
+              </button>
+            </div>
+
+            {/* Sort Dropdown */}
+            <select
+              value={payableSort}
+              onChange={(e) => setPayableSort(e.target.value)}
+              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer font-medium"
+            >
+              <option value="balance_desc">Sort: Payable (High to Low)</option>
+              <option value="days_desc">Sort: Days Pending (Oldest First)</option>
+              <option value="name_asc">Sort: Vendor Name (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Table Content */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase font-semibold tracking-wider">
+                <th className="px-4 py-3 text-center w-12">#</th>
+                <th className="px-4 py-3">Vendor Name</th>
+                <th className="px-4 py-3">Mobile No</th>
+                <th className="px-4 py-3">GSTIN</th>
+                <th className="px-4 py-3 text-center">Unpaid Invoices</th>
+                <th className="px-4 py-3 text-center">Max Aging</th>
+                <th className="px-4 py-3 text-right">Total Billed</th>
+                <th className="px-4 py-3 text-right">Total Paid</th>
+                <th className="px-4 py-3 text-right font-bold text-amber-700">Outstanding Balance</th>
+                <th className="px-4 py-3 text-center w-36">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm divide-y divide-slate-100 text-slate-700">
+              {filteredPayables.length === 0 ? (
+                <tr>
+                  <td colSpan="10" className="text-center py-10 text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <AlertCircle className="w-6 h-6 text-slate-300" />
+                      <p className="text-xs font-medium text-slate-500">No payables match your selected filter or search.</p>
+                      {payableAgingFilter !== 'all' || payableSearch ? (
+                        <button
+                          onClick={() => {
+                            setPayableAgingFilter('all');
+                            setPayableSearch('');
+                          }}
+                          className="mt-1 text-xs text-brand-600 hover:underline font-semibold"
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedPayables.map((v, idx) => {
+                  const itemIndex = (payablePage - 1) * payablePageSize + idx + 1;
+                  return (
+                    <tr 
+                      key={v.vendorId || idx} 
+                      className={`hover:bg-amber-50/20 transition-colors ${
+                        v.maxDaysPending >= 31 ? 'bg-amber-50/10' : ''
+                      }`}
+                    >
+                      {/* S.No */}
+                      <td className="px-4 py-3.5 text-center text-xs text-slate-400 font-mono">
+                        {itemIndex}
+                      </td>
+
+                      {/* Vendor Name */}
+                      <td className="px-4 py-3.5">
+                        <button
+                          onClick={() => onOpenVendorLedger && onOpenVendorLedger(v.rawVendor)}
+                          className="font-bold text-slate-900 hover:text-brand-600 truncate max-w-[200px] text-left transition-colors flex items-center gap-1.5"
+                          title="Click to open Vendor Ledger"
+                        >
+                          <span>{v.vendorName}</span>
+                          <ArrowUpRight className="w-3 h-3 text-slate-300 hover:text-brand-600" />
+                        </button>
+                        {v.urgentBillsCount > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded mt-0.5">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            {v.urgentBillsCount} invoice{v.urgentBillsCount > 1 ? 's' : ''} &gt; 30d
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Mobile */}
+                      <td className="px-4 py-3.5">
+                        {v.phone ? (
+                          <a
+                            href={`tel:${v.phone}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-mono text-xs font-semibold border border-emerald-200 transition-colors"
+                            title="Click to call vendor"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                            <span>{v.phone}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic font-mono">N/A</span>
+                        )}
+                      </td>
+
+                      {/* GSTIN */}
+                      <td className="px-4 py-3.5 font-mono text-xs text-slate-600">
+                        {v.gstin || 'URP'}
+                      </td>
+
+                      {/* Unpaid Invoices */}
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {v.unpaidBillsCount} bills
+                        </span>
+                      </td>
+
+                      {/* Max Aging */}
+                      <td className="px-4 py-3.5 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                            v.maxDaysPending >= 61
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : v.maxDaysPending >= 31
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : v.maxDaysPending >= 15
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {v.maxDaysPending} days
+                        </span>
+                      </td>
+
+                      {/* Total Billed */}
+                      <td className="px-4 py-3.5 text-right font-medium text-slate-600 text-xs">
+                        {formatCurrency(v.totalBilled)}
+                      </td>
+
+                      {/* Total Paid */}
+                      <td className="px-4 py-3.5 text-right font-semibold text-emerald-700 text-xs">
+                        {formatCurrency(v.totalPaid)}
+                      </td>
+
+                      {/* Outstanding Balance */}
+                      <td className="px-4 py-3.5 text-right font-bold text-amber-700 text-sm">
+                        {formatCurrency(v.balanceDue)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => onOpenVendorLedger && onOpenVendorLedger(v.rawVendor)}
+                            className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:text-brand-600 transition-colors shadow-2xs"
+                            title="View Vendor Ledger"
+                          >
+                            Ledger
+                          </button>
+                          {v.unpaidBills.length > 0 && onOpenPaymentModal && (
+                            <button
+                              onClick={() => onOpenPaymentModal(v.unpaidBills[0])}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors"
+                              title="Pay urgent invoice"
+                            >
+                              Pay
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {filteredPayables.length > 0 && (
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div>
+              Showing <span className="font-semibold text-slate-800">{(payablePage - 1) * payablePageSize + 1}</span> to{' '}
+              <span className="font-semibold text-slate-800">
+                {Math.min(payablePage * payablePageSize, filteredPayables.length)}
+              </span>{' '}
+              of <span className="font-semibold text-slate-800">{filteredPayables.length}</span> vendors
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPayablePage(p => Math.max(1, p - 1))}
+                disabled={payablePage === 1}
+                className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+              </button>
+
+              <span className="px-3 py-1 font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg">
+                Page {payablePage} of {totalPayablePages}
+              </span>
+
+              <button
+                onClick={() => setPayablePage(p => Math.min(totalPayablePages, p + 1))}
+                disabled={payablePage === totalPayablePages}
+                className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              >
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Recent Bills Activity Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Recent Purchase Bills</h3>
+            <p className="text-xs text-slate-400">Latest supplier invoices recorded in the system</p>
+          </div>
+          <button
+            onClick={() => onNavigate('bills')}
+            className="text-xs font-semibold text-brand-600 hover:text-brand-800 flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm transition-colors"
+          >
+            All Bills <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase font-semibold tracking-wider">
+                <th className="px-6 py-3.5">Date</th>
+                <th className="px-6 py-3.5">Invoice #</th>
+                <th className="px-6 py-3.5">Vendor</th>
+                <th className="px-6 py-3.5 text-right">Amount</th>
+                <th className="px-6 py-3.5 text-center">Status</th>
+                <th className="px-6 py-3.5 text-center w-20">Action</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm divide-y divide-slate-100 text-slate-700">
+              {stats.recentBills.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-8 text-slate-400">
+                    No purchase bills entered yet.
+                  </td>
+                </tr>
+              ) : (
+                stats.recentBills.map(b => (
+                  <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-3.5 text-slate-600 text-xs">{formatDate(b.date)}</td>
+                    <td className="px-6 py-3.5 font-bold text-slate-900">{b.invoiceNo || 'N/A'}</td>
+                    <td className="px-6 py-3.5 font-medium text-slate-800">{b.vendorName || 'N/A'}</td>
+                    <td className="px-6 py-3.5 text-right font-bold text-slate-900">{formatCurrency(b.grandTotal)}</td>
+                    <td className="px-6 py-3.5 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        b.paymentStatus === 'paid'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : b.paymentStatus === 'partial'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {b.paymentStatus === 'paid' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                        {b.paymentStatus ? b.paymentStatus.toUpperCase() : 'UNPAID'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 text-center">
+                      <button
+                        onClick={() => onViewBill(b.id)}
+                        className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="View Tax Invoice"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Printable Vendor Spending Distribution Modal */}
       {showVendorPrintModal && (

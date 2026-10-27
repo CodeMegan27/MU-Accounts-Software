@@ -2,28 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/mu_accounts_logo.svg" />
+    <link rel="icon" type="image/jpeg" href="/rs_designs_logo.jpg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="MU Accounts" />
-    <meta name="description" content="MU Accounts - Modern Enterprise Billing, Sales Orders, Purchases & GST Accounting" />
-    <title>MU Accounts - Enterprise Cloud Accounting & Billing</title>
+    <meta name="apple-mobile-web-app-title" content="RS DESIGNS" />
+    <meta name="description" content="RS DESIGNS - Modern Enterprise Billing, Sales Orders, Purchases & GST Accounting" />
+    <title>RS DESIGNS - Enterprise Billing & Accounting</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body class="bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
     <script>
-      // Self-healing: Unregister any rogue service workers on localhost that hijack Vite dev bundles
-      if ('serviceWorker' in navigator && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      // Immediate Cache Purge & Service Worker Uninstaller across all domains
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
           for (var i = 0; i < regs.length; i++) {
             regs[i].unregister();
           }
         });
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+          });
+        }
       }
     </script>
     <div id="root"></div>
@@ -35,7 +43,7 @@
         if (root && root.innerHTML.trim() === '') {
           root.innerHTML = '<div style=\"min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#fff;font-family:system-ui,sans-serif;padding:20px;text-align:center;\">' +
             '<div style=\"max-width:440px;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px;\">' +
-            '<h2 style=\"font-size:18px;font-weight:bold;color:#38bdf8;margin-bottom:8px;\">MU Accounts Workspace</h2>' +
+            '<h2 style=\"font-size:18px;font-weight:bold;color:#38bdf8;margin-bottom:8px;\">RS DESIGNS Workspace</h2>' +
             '<p style=\"font-size:13px;color:#94a3b8;line-height:1.5;margin-bottom:20px;\">Connecting to local workspace modules. Click below to load the latest verified build.</p>' +
             '<button onclick=\"window.location.reload(true)\" style=\"padding:10px 24px;background:#2563eb;color:#fff;font-weight:bold;font-size:13px;border:none;border-radius:10px;cursor:pointer;\">Reload Workspace</button>' +
             '</div></div>';

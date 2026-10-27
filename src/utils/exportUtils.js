@@ -179,8 +179,10 @@ export function exportAllVendorLedgersMultiSheet(vendors, bills, expenses = [], 
     const vBills = bills.filter(b => b.vendorId === v.id || b.vendorName === v.name);
     const vExpenses = getVendorExpenses(v);
     const vAssets = getVendorAssets(v);
-    let vBilled = 0;
-    let vPaid = 0;
+    const opBal = parseFloat(v.openingBalance) || 0;
+    const opType = v.openingBalanceType || 'payable';
+    let vBilled = opType === 'payable' ? opBal : 0;
+    let vPaid = opType === 'advance' ? opBal : 0;
 
     vBills.forEach(b => {
       const g = parseFloat(b.grandTotal) || 0;
@@ -202,6 +204,11 @@ export function exportAllVendorLedgersMultiSheet(vendors, bills, expenses = [], 
       vPaid += p;
     });
 
+    (v.paymentHistory || []).forEach(p => {
+      const pAmt = parseFloat(p.amount) || 0;
+      vPaid += pAmt;
+    });
+
     const vBal = vBilled - vPaid;
     grandTotalBilled += vBilled;
     grandTotalPaid += vPaid;
@@ -211,7 +218,9 @@ export function exportAllVendorLedgersMultiSheet(vendors, bills, expenses = [], 
       "Vendor Name": v.name || '',
       "GSTIN": v.gstin || 'UNREGISTERED',
       "Phone": v.phone || '',
-      "Bills Count": vBills.length + vExpenses.length + vAssets.length,
+      "Opening Bal (₹)": opBal > 0 ? Number(opBal.toFixed(2)) : 0,
+      "Bal Type": opBal > 0 ? (opType === 'advance' ? 'Cr (Adv)' : 'Dr (Payable)') : '-',
+      "Bills Count": vBills.length + vExpenses.length + vAssets.length + (opBal > 0 ? 1 : 0),
       "Total Billed (₹)": Number(vBilled.toFixed(2)),
       "Total Paid (₹)": Number(vPaid.toFixed(2)),
       "Outstanding Balance (₹)": Number(vBal.toFixed(2)),
@@ -241,8 +250,38 @@ export function exportAllVendorLedgersMultiSheet(vendors, bills, expenses = [], 
     const vExpenses = getVendorExpenses(v);
     const vAssets = getVendorAssets(v);
     const txs = [];
-    let vBilled = 0;
-    let vPaid = 0;
+    const opBal = parseFloat(v.openingBalance) || 0;
+    const opType = v.openingBalanceType || 'payable';
+    const opDate = v.openingBalanceDate || '2026-04-01';
+    let vBilled = opType === 'payable' ? opBal : 0;
+    let vPaid = opType === 'advance' ? opBal : 0;
+
+    if (opBal > 0) {
+      txs.push({
+        date: opDate,
+        type: 'OPENING BALANCE',
+        ref: 'OP-BAL',
+        particulars: `Opening Balance (${opType === 'advance' ? 'Advance Paid / Cr' : 'Payable / B/F'})`,
+        debit: opType === 'payable' ? opBal : 0,
+        credit: opType === 'advance' ? opBal : 0
+      });
+    }
+
+    // Process on-account advance payments
+    if (Array.isArray(v.paymentHistory) && v.paymentHistory.length > 0) {
+      v.paymentHistory.forEach(p => {
+        const pAmt = parseFloat(p.amount) || 0;
+        vPaid += pAmt;
+        txs.push({
+          date: p.date || '',
+          type: 'PAYMENT',
+          ref: p.reference || p.id,
+          particulars: `On-Account Payment via ${p.mode || 'Bank Transfer'}${p.notes ? ' (' + p.notes + ')' : ''}`,
+          debit: 0,
+          credit: pAmt
+        });
+      });
+    }
 
     vBills.forEach(b => {
       const gTotal = parseFloat(b.grandTotal) || 0;
@@ -343,8 +382,14 @@ export function exportAllVendorLedgersMultiSheet(vendors, bills, expenses = [], 
       }
     });
 
-    // Chronological order
-    txs.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Chronological order (placing OPENING BALANCE first if on same date)
+    txs.sort((a, b) => {
+      const diff = new Date(a.date || '1970-01-01') - new Date(b.date || '1970-01-01');
+      if (diff !== 0) return diff;
+      if (a.type === 'OPENING BALANCE') return -1;
+      if (b.type === 'OPENING BALANCE') return 1;
+      return 0;
+    });
 
     let running = 0;
     const vendorRows = [];
@@ -500,6 +545,9 @@ export function exportVendorsToExcel(vendors) {
     "Phone": v.phone || '',
     "Email": v.email || '',
     "Address": v.address || '',
+    "Opening Balance (₹)": parseFloat(v.openingBalance) || 0,
+    "Balance Type": (v.openingBalanceType || 'payable').toUpperCase(),
+    "Balance As Of": v.openingBalanceDate || '',
     "State": v.state || '',
     "Pincode": v.pincode || '',
     "Status": v.status || 'Active'

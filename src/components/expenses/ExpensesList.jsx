@@ -225,24 +225,22 @@ export default function ExpensesList({ onOpenCreateExpense, onEditExpense, onReq
                         {formatCurrency(exp.amount)}
                       </td>
                       <td className="px-5 py-3.5 text-center">
-                        {isAdmin && (
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => onEditExpense(exp)}
-                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Edit Expense"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => onRequestDelete('expenses', exp.id, exp.description || exp.category)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete Expense"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => onEditExpense(exp)}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Edit Expense (Admin PIN Required)"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onRequestDelete('expenses', exp.id, exp.description || exp.category)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Expense (Admin PIN Required)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

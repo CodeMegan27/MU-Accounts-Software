@@ -119,11 +119,11 @@ export default function SaleDetail({ sale, onBack, onRecordPayment, onEditSale }
           {/* Top Line: Logo + Company Info Left, Identification Card Right */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div className="flex flex-col sm:flex-row items-start gap-3.5 w-full sm:w-auto">
-              {/* High-Resolution Dynamic Company Logo */}
+              {/* High-Resolution RS DESIGNS Wings Logo */}
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border border-slate-200 p-1 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
                 <img 
-                  src={profile.logoUrl || "/mu_accounts_logo.svg"} 
-                  alt={profile.businessName || "MU Accounts"} 
+                  src="/rs_designs_logo.jpg" 
+                  alt="RS DESIGNS" 
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -131,8 +131,8 @@ export default function SaleDetail({ sale, onBack, onRecordPayment, onEditSale }
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-1.5">
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900">
-                      {profile.businessName || 'MU Accounts'}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-600 to-blue-700">
+                      RS DESIGNS
                     </span>
                   </h1>
                   <span className="bg-red-50 text-red-700 border border-red-200 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -484,7 +484,7 @@ export default function SaleDetail({ sale, onBack, onRecordPayment, onEditSale }
             </p>
           </div>
           <div className="text-center sm:text-right space-y-1">
-            <p className="text-xs font-black text-slate-900 uppercase tracking-wider">For {profile.businessName || 'MU Accounts'}</p>
+            <p className="text-xs font-black text-slate-900 uppercase tracking-wider">For RS DESIGNS</p>
             <div className="h-14"></div>
             <p className="border-t-2 border-slate-800 pt-1 font-black text-slate-800 w-48 text-center sm:ml-auto uppercase text-[11px] tracking-wider">
               Authorized Signatory

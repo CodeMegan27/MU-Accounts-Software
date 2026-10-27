@@ -11,7 +11,6 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import septemberSalesFull from '../data/september2026FullSales.json';
 import daybook2026Full from '../data/daybook2026Full.json';
 import defaultMasterItems from '../data/defaultMasterItems.json';
-import serverBackupPrePhase3 from '../data/server_backup_pre_phase3.json';
 import { 
   getServerTime, 
   getServerTimeISO, 
@@ -22,33 +21,8 @@ import {
 
 const DataContext = createContext(null);
 
-export const getActiveTenantId = () => {
-  try {
-    return localStorage.getItem('rsp_active_tenant_id') || 'tenant_mu_accounts';
-  } catch (e) {
-    return 'tenant_mu_accounts';
-  }
-};
-
-export const getTenantStorageKey = (key) => {
-  const tid = getActiveTenantId();
-  return `rsp_${tid}_${key}`;
-};
-
-export const getTenantCollectionPath = () => {
-  try {
-    const tenantId = getActiveTenantId();
-    if (!tenantId || tenantId === 'tenant_mu_accounts' || tenantId === 'default' || tenantId === 'tenant_rs_purchase' || tenantId === 'tenant_mu_accounts_demo') {
-      return BASE_COLLECTION_PATH;
-    }
-    return `artifacts/mu-accounts-tenants/${tenantId}`;
-  } catch (e) {
-    return BASE_COLLECTION_PATH;
-  }
-};
-
 export const DEFAULT_BRANCHES = ['KLK', 'RMD'];
-export const DEFAULT_DEPARTMENTS = ['OFFSET', 'FLEX', 'INVITATION', 'ADVERTISEMENT', 'PRINT & PACK', 'GENERAL ADMIN'];
+export const DEFAULT_DEPARTMENTS = ['ADVERTISEMENT', 'INVITATION', 'PRINT & PACK', 'GENERAL ADMIN'];
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Office Rent',
   'Salaries & Wages',
@@ -361,101 +335,9 @@ export function DataProvider({ children }) {
   const [assets, setAssets] = useState([]);
   const [recycleBin, setRecycleBin] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [sales, setSales] = useState(() => {
-    try {
-      const isWiped = localStorage.getItem('rsp_sales_wiped') === 'true';
-      if (isWiped) return [];
-      const stored = localStorage.getItem('rspSales');
-      if (stored !== null) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.map(ensureSaleTaxSeparated);
-        }
-      }
-      return septemberSalesFull.map(ensureSaleTaxSeparated);
-    } catch (e) {
-      return [];
-    }
-  });
 
-  // Enterprise Dynamic Masters
-  const [branches, setBranches] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_branches');
-      return s ? JSON.parse(s) : DEFAULT_BRANCHES;
-    } catch (e) {
-      return DEFAULT_BRANCHES;
-    }
-  });
-
-  const [departments, setDepartments] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_departments');
-      if (s) {
-        const parsed = JSON.parse(s);
-        return Array.from(new Set([...DEFAULT_DEPARTMENTS, ...parsed]));
-      }
-      return DEFAULT_DEPARTMENTS;
-    } catch (e) {
-      return DEFAULT_DEPARTMENTS;
-    }
-  });
-
-  const [branchDetails, setBranchDetails] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_branch_details');
-      if (s) return JSON.parse(s);
-    } catch (e) {}
-    return {
-      KLK: { code: 'KLK', name: 'Kilakarai Main Hub', address: 'Main Road, Kilakarai, Ramanathapuram - 623517', phone: '+91 98424 11223', inCharge: 'Syed Ibrahim', gstin: '33BLQPM9171A1ZA', status: 'ACTIVE' },
-      RMD: { code: 'RMD', name: 'Ramanathapuram Central', address: 'Bazaar Street, Ramanathapuram - 623501', phone: '+91 98424 44556', inCharge: 'Meganathan', gstin: '33BLQPM9171A1ZA', status: 'ACTIVE' }
-    };
-  });
-
-  const [departmentDetails, setDepartmentDetails] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_department_details');
-      if (s) return JSON.parse(s);
-    } catch (e) {}
-    return {
-      OFFSET: { code: 'OFFSET', name: 'Offset Printing Division', inCharge: 'Senthil', description: 'Multi-colour offset printing, brochures, books & flyers', status: 'ACTIVE' },
-      FLEX: { code: 'FLEX', name: 'Flex & Large Format Banners', inCharge: 'Murugan', description: 'Frontlit flex, vinyl stickers, glow sign boards & hoardings', status: 'ACTIVE' },
-      INVITATION: { code: 'INVITATION', name: 'Wedding & Event Cards', inCharge: 'Priya', description: 'Luxury invitations, foil stamping, laser cutting & embossing', status: 'ACTIVE' },
-      ADVERTISEMENT: { code: 'ADVERTISEMENT', name: 'Creative Advertisement & Branding', inCharge: 'Karthik', description: 'Digital marketing, outdoor hoardings & corporate branding', status: 'ACTIVE' },
-      'PRINT & PACK': { code: 'PRINT & PACK', name: 'Packaging & Box Manufacturing', inCharge: 'Rajesh', description: 'Custom packaging cartons, corrugated boxes & labels', status: 'ACTIVE' },
-      'GENERAL ADMIN': { code: 'GENERAL ADMIN', name: 'General Administration & Accounts', inCharge: 'Finance Team', description: 'Central corporate management, procurement & compliance', status: 'ACTIVE' }
-    };
-  });
-
-  const [expenseCategories, setExpenseCategories] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_expense_categories');
-      return s ? JSON.parse(s) : DEFAULT_EXPENSE_CATEGORIES;
-    } catch (e) {
-      return DEFAULT_EXPENSE_CATEGORIES;
-    }
-  });
-
-  const [paymentMethods, setPaymentMethods] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_payment_methods');
-      return s ? JSON.parse(s) : DEFAULT_PAYMENT_METHODS;
-    } catch (e) {
-      return DEFAULT_PAYMENT_METHODS;
-    }
-  });
-
-  const [customVouchers, setCustomVouchers] = useState(() => {
-    try {
-      const s = localStorage.getItem('rsp_custom_vouchers');
-      return s ? JSON.parse(s) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  // Add an entry to Audit Activity Logs with Real-World Server Time
-  const logActivity = useCallback(async ({ action, entityType, entityId, title, details, userRole = 'admin', snapshot, daybookSnapshot }) => {
+  // Add an entry to Audit Activity Logs with Real-World Server Time (Declared early to prevent TDZ)
+  const logActivity = useCallback(async ({ action, entityType, entityId, title, details, userRole = 'admin' }) => {
     const accurateTimestamp = getServerTimeISO();
     const accurateNow = getServerTime().getTime();
     const logId = `LOG_${accurateNow}_${Math.random().toString(36).substr(2, 4)}`;
@@ -467,9 +349,7 @@ export function DataProvider({ children }) {
       entityId,
       title: title || 'Activity Recorded',
       details: details || '',
-      userRole,
-      ...(snapshot ? { snapshot } : {}),
-      ...(daybookSnapshot ? { daybookSnapshot } : {})
+      userRole
     };
 
     setLogs(prev => {
@@ -503,12 +383,85 @@ export function DataProvider({ children }) {
     // Cloud persist with timeout
     if (navigator.onLine && db) {
       try {
-        await setDoc(doc(db, getTenantCollectionPath(), 'audit_logs', logId), logEntry);
+        await setDoc(doc(db, BASE_COLLECTION_PATH, 'audit_logs', logId), logEntry);
       } catch (e) {
         // Fail silently for log persistence
       }
     }
   }, []);
+
+  const removeDraftActivityLog = useCallback((draftId) => {
+    if (!draftId) return;
+    setLogs(prev => {
+      const filtered = prev.filter(l => !(l.action === 'DRAFT_SAVED' && l.entityId === draftId));
+      try {
+        localStorage.setItem('rspLogs', JSON.stringify(filtered));
+      } catch (e) {}
+      return filtered;
+    });
+  }, []);
+  const [sales, setSales] = useState(() => {
+    try {
+      const isWiped = localStorage.getItem('rsp_sales_wiped') === 'true';
+      if (isWiped) return [];
+      const stored = localStorage.getItem('rspSales');
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.map(ensureSaleTaxSeparated);
+        }
+      }
+      return septemberSalesFull.map(ensureSaleTaxSeparated);
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Enterprise Dynamic Masters
+  const [branches, setBranches] = useState(() => {
+    try {
+      const s = localStorage.getItem('rsp_branches');
+      return s ? JSON.parse(s) : DEFAULT_BRANCHES;
+    } catch (e) {
+      return DEFAULT_BRANCHES;
+    }
+  });
+
+  const [departments, setDepartments] = useState(() => {
+    try {
+      const s = localStorage.getItem('rsp_departments');
+      return s ? JSON.parse(s) : DEFAULT_DEPARTMENTS;
+    } catch (e) {
+      return DEFAULT_DEPARTMENTS;
+    }
+  });
+
+  const [expenseCategories, setExpenseCategories] = useState(() => {
+    try {
+      const s = localStorage.getItem('rsp_expense_categories');
+      return s ? JSON.parse(s) : DEFAULT_EXPENSE_CATEGORIES;
+    } catch (e) {
+      return DEFAULT_EXPENSE_CATEGORIES;
+    }
+  });
+
+  const [paymentMethods, setPaymentMethods] = useState(() => {
+    try {
+      const s = localStorage.getItem('rsp_payment_methods');
+      return s ? JSON.parse(s) : DEFAULT_PAYMENT_METHODS;
+    } catch (e) {
+      return DEFAULT_PAYMENT_METHODS;
+    }
+  });
+
+  const [customVouchers, setCustomVouchers] = useState(() => {
+    try {
+      const s = localStorage.getItem('rsp_custom_vouchers');
+      return s ? JSON.parse(s) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Day Book Transactions (Chronological Cash & Bank Ledger)
   const [daybookTransactions, setDaybookTransactions] = useState(() => {
@@ -798,16 +751,6 @@ export function DataProvider({ children }) {
     };
   }, []);
 
-  const removeDraftActivityLog = useCallback((draftId) => {
-    if (!draftId) return;
-    setLogs(prev => {
-      const updated = prev.filter(l => !(l.action === 'DRAFT_SAVED' && l.entityId === draftId));
-      try {
-        localStorage.setItem('rspLogs', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-  }, []);
 
   const clearAllDraftLogs = useCallback(() => {
     setLogs(prev => {
@@ -832,9 +775,9 @@ export function DataProvider({ children }) {
     for (const item of queueToProcess) {
       try {
         if (item.action === 'set') {
-          await setDoc(doc(db, getTenantCollectionPath(), item.col, item.id), item.data);
+          await setDoc(doc(db, BASE_COLLECTION_PATH, item.col, item.id), item.data);
         } else if (item.action === 'delete') {
-          await deleteDoc(doc(db, getTenantCollectionPath(), item.col, item.id));
+          await deleteDoc(doc(db, BASE_COLLECTION_PATH, item.col, item.id));
         }
       } catch (err) {
         console.warn(`Failed to sync item ${item.id} to ${item.col}, will retry:`, err);
@@ -897,7 +840,7 @@ export function DataProvider({ children }) {
           localStorage.setItem('rspRecycleBin', JSON.stringify(valid));
           if (navigator.onLine && db) {
             expiredIds.forEach(id => {
-              deleteDoc(doc(db, getTenantCollectionPath(), 'recycle_bin', id)).catch(() => {});
+              deleteDoc(doc(db, BASE_COLLECTION_PATH, 'recycle_bin', id)).catch(() => {});
             });
           }
         }
@@ -910,94 +853,60 @@ export function DataProvider({ children }) {
 
   const loadFromLocalStorage = useCallback(() => {
     try {
-      const tid = getActiveTenantId();
-      const isPrimaryOrDemo = !tid || tid === 'tenant_mu_accounts' || tid === 'default' || tid === 'tenant_rs_purchase' || tid === 'tenant_mu_accounts_demo';
-
-      // 1. Bills
-      const rawBills = localStorage.getItem(getTenantStorageKey('bills')) || (isPrimaryOrDemo ? localStorage.getItem('rspBills') : null);
-      if (rawBills) {
-        try {
-          const raw = JSON.parse(rawBills);
-          setBills(raw.map(b => normalizeBill(b, b.id)));
-        } catch (e) { setBills([]); }
-      } else {
-        setBills([]);
+      if (localStorage.getItem('rspBills')) {
+        const raw = JSON.parse(localStorage.getItem('rspBills'));
+        setBills(raw.map(b => normalizeBill(b, b.id)));
       }
-
-      // 2. Vendors
-      const rawVendors = localStorage.getItem(getTenantStorageKey('vendors')) || (isPrimaryOrDemo ? localStorage.getItem('rspVendors') : null);
-      if (rawVendors) {
-        try { setVendors(JSON.parse(rawVendors)); } catch (e) { setVendors([]); }
-      } else {
-        setVendors([]);
-      }
-
-      // 3. Items
-      const rawItems = localStorage.getItem(getTenantStorageKey('items')) || (isPrimaryOrDemo ? localStorage.getItem('rspItems') : null);
-      if (rawItems) {
-        try {
-          const parsed = JSON.parse(rawItems);
+      if (localStorage.getItem('rspVendors')) setVendors(JSON.parse(localStorage.getItem('rspVendors')));
+      if (localStorage.getItem('rspItems')) {
+        const parsed = JSON.parse(localStorage.getItem('rspItems'));
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const sanitized = sanitizeProductItems(parsed);
           setItems(sanitized.length > 0 ? sanitized : defaultMasterItems);
-        } catch (e) { setItems(defaultMasterItems); }
+        } else {
+          setItems(defaultMasterItems);
+        }
       } else {
         setItems(defaultMasterItems);
       }
-
-      // 4. Expenses
-      const rawExpenses = localStorage.getItem(getTenantStorageKey('expenses')) || (isPrimaryOrDemo ? localStorage.getItem('rspExpenses') : null);
-      if (rawExpenses) {
-        try { setExpenses(JSON.parse(rawExpenses)); } catch (e) { setExpenses([]); }
+      if (localStorage.getItem('rspExpenses')) {
+        const parsed = JSON.parse(localStorage.getItem('rspExpenses'));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setExpenses(parsed);
+        } else {
+          setExpenses(extractExpensesFromDaybook(daybook2026Full));
+        }
       } else {
-        setExpenses(isPrimaryOrDemo ? extractExpensesFromDaybook(daybook2026Full) : []);
+        setExpenses(extractExpensesFromDaybook(daybook2026Full));
       }
-
-      // 5. Assets
-      const rawAssets = localStorage.getItem(getTenantStorageKey('assets')) || (isPrimaryOrDemo ? localStorage.getItem('rspAssets') : null);
-      if (rawAssets) {
-        try { setAssets(JSON.parse(rawAssets)); } catch (e) { setAssets([]); }
+      if (localStorage.getItem('rspAssets')) setAssets(JSON.parse(localStorage.getItem('rspAssets')));
+      if (localStorage.getItem('rspRecycleBin')) setRecycleBin(JSON.parse(localStorage.getItem('rspRecycleBin')));
+      if (localStorage.getItem('rspLogs')) setLogs(sanitizeLogs(JSON.parse(localStorage.getItem('rspLogs'))));
+      const isSalesWiped = localStorage.getItem('rsp_sales_wiped') === 'true';
+      if (isSalesWiped) {
+        setSales([]);
       } else {
-        setAssets([]);
+        const storedSales = localStorage.getItem('rspSales');
+        if (storedSales !== null) {
+          const parsed = JSON.parse(storedSales);
+          if (Array.isArray(parsed)) {
+            setSales(parsed);
+          } else {
+            setSales(septemberSalesFull);
+          }
+        } else {
+          setSales(septemberSalesFull);
+        }
       }
-
-      // 6. Recycle Bin
-      const rawBin = localStorage.getItem(getTenantStorageKey('recycle_bin')) || (isPrimaryOrDemo ? localStorage.getItem('rspRecycleBin') : null);
-      if (rawBin) {
-        try { setRecycleBin(JSON.parse(rawBin)); } catch (e) { setRecycleBin([]); }
-      } else {
-        setRecycleBin([]);
-      }
-
-      // 7. Logs
-      const rawLogs = localStorage.getItem(getTenantStorageKey('logs')) || (isPrimaryOrDemo ? localStorage.getItem('rspLogs') : null);
-      if (rawLogs) {
-        try { setLogs(sanitizeLogs(JSON.parse(rawLogs))); } catch (e) { setLogs([]); }
-      } else {
-        setLogs([]);
-      }
-
-      // 8. Sales
-      const rawSales = localStorage.getItem(getTenantStorageKey('sales')) || (isPrimaryOrDemo ? localStorage.getItem('rspSales') : null);
-      if (rawSales) {
-        try { setSales(JSON.parse(rawSales)); } catch (e) { setSales([]); }
-      } else {
-        setSales(isPrimaryOrDemo ? septemberSalesFull : []);
-      }
-
-      // 9. Daybook
-      const rawDb = localStorage.getItem(getTenantStorageKey('daybook')) || (isPrimaryOrDemo ? localStorage.getItem('rsp_daybook_transactions') : null);
-      if (rawDb) {
-        try { setDaybookTransactions(JSON.parse(rawDb)); } catch (e) { setDaybookTransactions([]); }
-      } else {
-        setDaybookTransactions(isPrimaryOrDemo ? daybook2026Full.filter(e => isDaybookEntryAssociated(e)) : []);
-      }
-
-      // 10. Branches & Departments
-      const rawBranches = localStorage.getItem(getTenantStorageKey('branches')) || (isPrimaryOrDemo ? localStorage.getItem('rsp_branches') : null);
-      if (rawBranches) {
-        try { setBranches(JSON.parse(rawBranches)); } catch (e) {}
-      } else if (!isPrimaryOrDemo) {
-        setBranches(['MAIN']);
+      if (localStorage.getItem('rsp_daybook_transactions')) {
+        const parsedDb = JSON.parse(localStorage.getItem('rsp_daybook_transactions'));
+        if (Array.isArray(parsedDb)) {
+          if (isSalesWiped) {
+            setDaybookTransactions(parsedDb.filter(e => e.category !== 'SALES' && !e.matchedSaleId));
+          } else {
+            setDaybookTransactions(parsedDb);
+          }
+        }
       }
     } catch (e) {
       console.warn('LocalStorage load notice:', e);
@@ -1006,14 +915,14 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(getTenantStorageKey('items'), JSON.stringify(items));
+      localStorage.setItem('rspItems', JSON.stringify(items));
     } catch (e) {}
   }, [items]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(getTenantStorageKey('expenses'), JSON.stringify(expenses));
+        localStorage.setItem('rspExpenses', JSON.stringify(expenses));
       } catch (e) {}
     }, 400);
     return () => clearTimeout(timer);
@@ -1023,7 +932,11 @@ export function DataProvider({ children }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(getTenantStorageKey('sales'), JSON.stringify(sales));
+        if (localStorage.getItem('rsp_sales_wiped') === 'true') {
+          localStorage.setItem('rspSales', JSON.stringify([]));
+        } else {
+          localStorage.setItem('rspSales', JSON.stringify(sales));
+        }
       } catch (e) {}
     }, 400);
     return () => clearTimeout(timer);
@@ -1032,7 +945,7 @@ export function DataProvider({ children }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(getTenantStorageKey('daybook'), JSON.stringify(daybookTransactions));
+        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(daybookTransactions));
       } catch (e) {}
     }, 400);
     return () => clearTimeout(timer);
@@ -1080,10 +993,9 @@ export function DataProvider({ children }) {
 
     function setupListeners() {
       try {
-        const tenantPath = getTenantCollectionPath();
         // Bills Listener - Merges snapshot with pending offline items
         const unsubBills = onSnapshot(
-          collection(db, tenantPath, 'bills'),
+          collection(db, BASE_COLLECTION_PATH, 'bills'),
           (snapshot) => {
             const rawList = [];
             snapshot.forEach(d => {
@@ -1092,7 +1004,7 @@ export function DataProvider({ children }) {
             const merged = mergeSnapshotWithPendingQueue(rawList, 'bills', normalizeBill);
             merged.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
             setBills(merged);
-            localStorage.setItem(getTenantStorageKey('bills'), JSON.stringify(merged));
+            localStorage.setItem('rspBills', JSON.stringify(merged));
           },
           (err) => {
             console.warn('Bills listener fallback to local:', err);
@@ -1102,14 +1014,14 @@ export function DataProvider({ children }) {
 
         // Vendors Listener
         const unsubVendors = onSnapshot(
-          collection(db, tenantPath, 'vendors'),
+          collection(db, BASE_COLLECTION_PATH, 'vendors'),
           (snapshot) => {
             const rawList = [];
             snapshot.forEach(d => rawList.push({ ...d.data(), id: d.data().id || d.id }));
             const merged = mergeSnapshotWithPendingQueue(rawList, 'vendors');
             merged.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             setVendors(merged);
-            localStorage.setItem(getTenantStorageKey('vendors'), JSON.stringify(merged));
+            localStorage.setItem('rspVendors', JSON.stringify(merged));
           },
           (err) => console.warn('Vendors listener note:', err)
         );
@@ -1117,7 +1029,7 @@ export function DataProvider({ children }) {
 
         // Items Listener
         const unsubItems = onSnapshot(
-          collection(db, tenantPath, 'items'),
+          collection(db, BASE_COLLECTION_PATH, 'items'),
           (snapshot) => {
             const rawList = [];
             snapshot.forEach(d => rawList.push({ ...d.data(), id: d.data().id || d.id }));
@@ -1125,7 +1037,7 @@ export function DataProvider({ children }) {
             merged.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             if (merged.length > 0) {
               setItems(merged);
-              localStorage.setItem(getTenantStorageKey('items'), JSON.stringify(merged));
+              localStorage.setItem('rspItems', JSON.stringify(merged));
             } else {
               setItems(prev => (prev && prev.length > 0 ? prev : defaultMasterItems));
             }
@@ -1136,14 +1048,14 @@ export function DataProvider({ children }) {
 
         // Expenses Listener
         const unsubExpenses = onSnapshot(
-          collection(db, tenantPath, 'expenses'),
+          collection(db, BASE_COLLECTION_PATH, 'expenses'),
           (snapshot) => {
             const rawList = [];
             snapshot.forEach(d => rawList.push({ ...d.data(), id: d.data().id || d.id }));
             const merged = mergeSnapshotWithPendingQueue(rawList, 'expenses');
             merged.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
             setExpenses(merged);
-            localStorage.setItem(getTenantStorageKey('expenses'), JSON.stringify(merged));
+            localStorage.setItem('rspExpenses', JSON.stringify(merged));
           },
           (err) => console.warn('Expenses listener note:', err)
         );
@@ -1151,14 +1063,14 @@ export function DataProvider({ children }) {
 
         // Assets Listener
         const unsubAssets = onSnapshot(
-          collection(db, tenantPath, 'assets'),
+          collection(db, BASE_COLLECTION_PATH, 'assets'),
           (snapshot) => {
             const rawList = [];
             snapshot.forEach(d => rawList.push({ ...d.data(), id: d.data().id || d.id }));
             const merged = mergeSnapshotWithPendingQueue(rawList, 'assets');
             merged.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
             setAssets(merged);
-            localStorage.setItem(getTenantStorageKey('assets'), JSON.stringify(merged));
+            localStorage.setItem('rspAssets', JSON.stringify(merged));
           },
           (err) => console.warn('Assets listener note:', err)
         );
@@ -1166,13 +1078,13 @@ export function DataProvider({ children }) {
 
         // Recycle Bin Listener
         const unsubBin = onSnapshot(
-          collection(db, tenantPath, 'recycle_bin'),
+          collection(db, BASE_COLLECTION_PATH, 'recycle_bin'),
           (snapshot) => {
             const list = [];
             snapshot.forEach(d => list.push({ ...d.data(), id: d.data().id || d.id }));
             list.sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
             setRecycleBin(list);
-            localStorage.setItem(getTenantStorageKey('recycle_bin'), JSON.stringify(list));
+            localStorage.setItem('rspRecycleBin', JSON.stringify(list));
           },
           (err) => console.warn('Recycle bin note:', err)
         );
@@ -1180,13 +1092,13 @@ export function DataProvider({ children }) {
 
         // Audit Logs Listener
         const unsubLogs = onSnapshot(
-          collection(db, tenantPath, 'audit_logs'),
+          collection(db, BASE_COLLECTION_PATH, 'audit_logs'),
           (snapshot) => {
             const list = [];
             snapshot.forEach(d => list.push({ ...d.data(), id: d.data().id || d.id }));
             list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
             setLogs(list.slice(0, 500));
-            localStorage.setItem(getTenantStorageKey('logs'), JSON.stringify(list.slice(0, 500)));
+            localStorage.setItem('rspLogs', JSON.stringify(list.slice(0, 500)));
           },
           (err) => console.warn('Audit logs note:', err)
         );
@@ -1200,19 +1112,7 @@ export function DataProvider({ children }) {
 
     initFirestore();
 
-    const handleTenantSwitch = () => {
-      loadFromLocalStorage();
-      unsubs.forEach(u => typeof u === 'function' && u());
-      unsubs = [];
-      if (navigator.onLine && db && auth) {
-        setupListeners();
-      }
-    };
-
-    window.addEventListener('rsp_tenant_switched', handleTenantSwitch);
-
     return () => {
-      window.removeEventListener('rsp_tenant_switched', handleTenantSwitch);
       unsubs.forEach(u => typeof u === 'function' && u());
     };
   }, [loadFromLocalStorage, cleanExpiredRecycleBin, mergeSnapshotWithPendingQueue, syncPendingQueue]);
@@ -1227,7 +1127,7 @@ export function DataProvider({ children }) {
     }
 
     try {
-      const savePromise = setDoc(doc(db, getTenantCollectionPath(), col, id), data);
+      const savePromise = setDoc(doc(db, BASE_COLLECTION_PATH, col, id), data);
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Network save timeout')), 2500)
       );
@@ -1251,7 +1151,7 @@ export function DataProvider({ children }) {
     }
 
     try {
-      const deletePromise = deleteDoc(doc(db, getTenantCollectionPath(), col, id));
+      const deletePromise = deleteDoc(doc(db, BASE_COLLECTION_PATH, col, id));
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Network delete timeout')), 2500)
       );
@@ -1463,6 +1363,147 @@ export function DataProvider({ children }) {
       details: `Recalculated balance: ₹${balance.toLocaleString('en-IN')}`
     });
     return updated;
+  };
+
+  const recordVendorAdvancePayment = async (vendorId, paymentDetails) => {
+    const v = vendors.find(item => item.id === vendorId);
+    if (!v) throw new Error('Vendor not found');
+
+    const pAmt = parseFloat(paymentDetails.amount) || 0;
+    if (pAmt <= 0) throw new Error('Payment amount must be greater than zero');
+
+    const newPaymentRecord = {
+      id: `VPAY_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      date: paymentDetails.date || new Date().toISOString().slice(0, 10),
+      amount: pAmt,
+      mode: paymentDetails.mode || 'Bank Transfer',
+      reference: paymentDetails.reference || '',
+      notes: paymentDetails.notes || '',
+      recordedAt: new Date().toISOString()
+    };
+
+    const updatedHistory = [...(v.paymentHistory || []), newPaymentRecord];
+    const updatedVendor = {
+      ...v,
+      paymentHistory: updatedHistory,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (paymentDetails.syncToDaybook !== false) {
+      const isCash = isPaymentCash(paymentDetails.mode);
+      addDaybookTransaction({
+        id: `db_vpay_${vendorId}_${Date.now()}`,
+        date: newPaymentRecord.date,
+        estNo: newPaymentRecord.reference || '',
+        payment: newPaymentRecord.mode,
+        branch: 'KLK',
+        department: 'GENERAL ADMIN',
+        category: 'VENDOR PAYMENT',
+        description: `Advance/On-Account Payment to ${v.name}${newPaymentRecord.notes ? ' - ' + newPaymentRecord.notes : ''}`,
+        cashCredit: 0,
+        cashDebit: isCash ? pAmt : 0,
+        bankCredit: 0,
+        bankDebit: !isCash ? pAmt : 0,
+        balanceNote: 'Advance / On-Account',
+        vendorId: v.id
+      });
+    }
+
+    logActivity({
+      action: 'PAYMENT',
+      entityType: 'vendor',
+      entityId: vendorId,
+      title: `Advance Payment to ${v.name}`,
+      details: `Paid ₹${pAmt.toLocaleString('en-IN')} via ${paymentDetails.mode || 'Transfer'}`
+    });
+
+    return await saveVendor(updatedVendor);
+  };
+
+  const recordVendorPayment = async (vendorId, paymentDetails) => {
+    // 1. Direct payment against a specific invoice
+    if (paymentDetails.billId) {
+      return await recordBillPayment(paymentDetails.billId, paymentDetails);
+    }
+
+    const pAmt = parseFloat(paymentDetails.amount) || 0;
+    if (pAmt <= 0) throw new Error('Payment amount must be greater than zero');
+
+    const v = vendors.find(item => item.id === vendorId);
+    if (!v) throw new Error('Vendor not found');
+
+    // 2. Auto-allocation across oldest unpaid invoices (FIFO)
+    if (paymentDetails.allocationMode === 'fifo') {
+      const vBills = bills
+        .filter(b => (b.vendorId === v.id || b.vendorName === v.name) && (b.paymentStatus !== 'paid'))
+        .sort((a, b) => new Date(a.date || '1970-01-01') - new Date(b.date || '1970-01-01'));
+
+      let remaining = pAmt;
+      for (const bill of vBills) {
+        if (remaining <= 0) break;
+        const grandTotal = parseFloat(bill.grandTotal) || 0;
+        const currentPaid = parseFloat(bill.paidAmount) || 0;
+        const billBalance = bill.balanceAmount !== undefined ? parseFloat(bill.balanceAmount) : (grandTotal - currentPaid);
+        if (billBalance <= 0) continue;
+
+        const allocatedAmt = Math.min(billBalance, remaining);
+        await recordBillPayment(bill.id, {
+          ...paymentDetails,
+          amount: allocatedAmt,
+          notes: `${paymentDetails.notes ? paymentDetails.notes + ' • ' : ''}FIFO payment allocation`
+        });
+        remaining -= allocatedAmt;
+      }
+
+      // If surplus amount exists after clearing all bills, record as advance payment
+      if (remaining > 0.01) {
+        await recordVendorAdvancePayment(v.id, {
+          ...paymentDetails,
+          amount: remaining,
+          notes: `${paymentDetails.notes ? paymentDetails.notes + ' • ' : ''}Advance balance surplus`
+        });
+      }
+      return true;
+    }
+
+    // 3. Direct Advance / On-Account payment
+    return await recordVendorAdvancePayment(v.id, paymentDetails);
+  };
+
+  const deleteVendorPayment = async (vendorId, paymentId) => {
+    const v = vendors.find(item => item.id === vendorId);
+    if (!v) throw new Error('Vendor not found');
+
+    const updatedHistory = (v.paymentHistory || []).filter(p => p.id !== paymentId);
+    const updatedVendor = {
+      ...v,
+      paymentHistory: updatedHistory,
+      updatedAt: new Date().toISOString()
+    };
+    return await saveVendor(updatedVendor);
+  };
+
+  const updateVendorPayment = async (vendorId, paymentId, updatedPayment) => {
+    const v = vendors.find(item => item.id === vendorId);
+    if (!v) throw new Error('Vendor not found');
+
+    const updatedHistory = (v.paymentHistory || []).map(p => {
+      if (p.id === paymentId) {
+        return {
+          ...p,
+          ...updatedPayment,
+          amount: parseFloat(updatedPayment.amount !== undefined ? updatedPayment.amount : p.amount) || 0
+        };
+      }
+      return p;
+    });
+
+    const updatedVendor = {
+      ...v,
+      paymentHistory: updatedHistory,
+      updatedAt: new Date().toISOString()
+    };
+    return await saveVendor(updatedVendor);
   };
 
   // Move Bill to 3-Day Recycle Bin instead of permanent destruction
@@ -2033,20 +2074,13 @@ export function DataProvider({ children }) {
 
   const exportAllDataJSON = () => {
     const backup = {
-      version: '2.4.0-enterprise',
+      version: '1.0',
       exportedAt: new Date().toISOString(),
-      companyName: 'MU Accounts',
-      companyEmail: 'meganfullsd@gmail.com',
-      branches: customBranches,
-      departments: customDepartments,
       bills,
       vendors,
       items,
       expenses,
       assets,
-      sales,
-      daybook: daybookTransactions,
-      customVouchers,
       recycleBin,
       logs
     };
@@ -2054,7 +2088,7 @@ export function DataProvider({ children }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `MUAccounts_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `RSPurchase_Backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -2067,9 +2101,6 @@ export function DataProvider({ children }) {
     const iList = jsonData.items || [];
     const eList = jsonData.expenses || [];
     const aList = jsonData.assets || [];
-    const sList = jsonData.sales || [];
-    const dList = jsonData.daybook || jsonData.daybookTransactions || [];
-    const vcList = jsonData.customVouchers || jsonData.vouchers || [];
 
     for (const b of bList) await saveBill(b);
     for (const v of vList) await saveVendor(v);
@@ -2077,173 +2108,13 @@ export function DataProvider({ children }) {
     for (const e of eList) await saveExpense(e);
     for (const a of aList) await saveAsset(a);
 
-    if (Array.isArray(sList) && sList.length > 0) {
-      setSales(sList);
-      try {
-        localStorage.setItem('rsp_sales_records', JSON.stringify(sList));
-      } catch (e) {}
-    }
-
-    if (Array.isArray(dList) && dList.length > 0) {
-      setDaybookTransactions(dList);
-      try {
-        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(dList));
-      } catch (e) {}
-    }
-
-    if (Array.isArray(vcList) && vcList.length > 0) {
-      setCustomVouchers(vcList);
-      try {
-        localStorage.setItem('rsp_custom_vouchers', JSON.stringify(vcList));
-      } catch (e) {}
-    }
-
-    if (Array.isArray(jsonData.branches) && jsonData.branches.length > 0) {
-      setCustomBranches(jsonData.branches);
-      try {
-        localStorage.setItem('rsp_custom_branches', JSON.stringify(jsonData.branches));
-      } catch (e) {}
-    }
-
-    if (Array.isArray(jsonData.departments) && jsonData.departments.length > 0) {
-      setCustomDepartments(jsonData.departments);
-      try {
-        localStorage.setItem('rsp_custom_departments', JSON.stringify(jsonData.departments));
-      } catch (e) {}
-    }
-
     return {
       billsCount: bList.length,
       vendorsCount: vList.length,
       itemsCount: iList.length,
       expensesCount: eList.length,
-      assetsCount: aList.length,
-      salesCount: sList.length,
-      daybookCount: dList.length
+      assetsCount: aList.length
     };
-  };
-
-  // --- SERVER BACKUP & RETRIEVAL ENGINE (PERMANENT SERVER SNAPSHOTS) ---
-  const [serverBackupsList, setServerBackupsList] = useState(() => {
-    try {
-      const local = JSON.parse(localStorage.getItem('rsp_server_backups') || '[]');
-      if (!local.some(b => b.id === 'backup_pre_phase3_20261014')) {
-        return [serverBackupPrePhase3, ...local];
-      }
-      return local;
-    } catch (e) {
-      return [serverBackupPrePhase3];
-    }
-  });
-
-  // Ensure permanent Pre-Phase 3 server snapshot is mirrored to Firestore
-  useEffect(() => {
-    if (navigator.onLine && db) {
-      try {
-        setDoc(doc(db, 'artifacts/mu-accounts-system', 'server_backups', 'backup_pre_phase3_20261014'), {
-          id: 'backup_pre_phase3_20261014',
-          title: 'Pre-Phase 3 Permanent Master Company Snapshot',
-          version: '2.4.0-enterprise',
-          createdAt: '2026-10-14T16:55:00.000Z',
-          createdBy: 'meganfullsd@gmail.com (Developer)',
-          companyName: 'MU Accounts',
-          companyEmail: 'meganfullsd@gmail.com',
-          summary: {
-            salesCount: Array.isArray(serverBackupPrePhase3.sales) ? serverBackupPrePhase3.sales.length : 0,
-            daybookCount: Array.isArray(serverBackupPrePhase3.daybook) ? serverBackupPrePhase3.daybook.length : 0,
-            itemsCount: Array.isArray(serverBackupPrePhase3.items) ? serverBackupPrePhase3.items.length : 0
-          },
-          status: 'PERMANENT_SERVER_BACKUP'
-        }).catch(() => {});
-      } catch (e) {}
-    }
-  }, []);
-
-  const createLiveServerBackup = async (title) => {
-    const backupId = `server_backup_${Date.now()}`;
-    const cleanTitle = title || `Live Server Snapshot - ${new Date().toLocaleDateString('en-GB')}`;
-    const backupPayload = {
-      id: backupId,
-      title: cleanTitle,
-      version: '2.4.0-enterprise',
-      createdAt: new Date().toISOString(),
-      createdBy: 'meganfullsd@gmail.com (Developer)',
-      companyName: 'MU Accounts',
-      companyEmail: 'meganfullsd@gmail.com',
-      summary: {
-        billsCount: bills.length,
-        vendorsCount: vendors.length,
-        itemsCount: items.length,
-        expensesCount: expenses.length,
-        assetsCount: assets.length,
-        salesCount: sales.length,
-        daybookCount: daybookTransactions.length
-      },
-      branches: customBranches,
-      departments: customDepartments,
-      bills,
-      vendors,
-      items,
-      expenses,
-      assets,
-      sales,
-      daybook: daybookTransactions,
-      customVouchers,
-      recycleBin,
-      logs
-    };
-
-    setServerBackupsList(prev => {
-      const updated = [backupPayload, ...prev.filter(b => b.id !== backupId)].slice(0, 25);
-      try {
-        localStorage.setItem('rsp_server_backups', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-
-    if (navigator.onLine && db) {
-      try {
-        await setDoc(doc(db, 'artifacts/mu-accounts-system', 'server_backups', backupId), {
-          id: backupId,
-          title: backupPayload.title,
-          version: backupPayload.version,
-          createdAt: backupPayload.createdAt,
-          createdBy: backupPayload.createdBy,
-          companyName: backupPayload.companyName,
-          companyEmail: backupPayload.companyEmail,
-          summary: backupPayload.summary,
-          status: 'USER_LIVE_BACKUP',
-          dataPayloadJSON: JSON.stringify(backupPayload)
-        });
-      } catch (err) {
-        console.warn('Firestore server backup persist notice:', err);
-      }
-    }
-
-    logActivity('SERVER_BACKUP_CREATED', `Created permanent server backup snapshot: ${cleanTitle} by meganfullsd@gmail.com`);
-
-    return backupPayload;
-  };
-
-  const restoreServerBackup = async (backupIdOrData) => {
-    let target = null;
-    if (typeof backupIdOrData === 'object' && backupIdOrData !== null) {
-      target = backupIdOrData;
-    } else {
-      if (backupIdOrData === 'backup_pre_phase3_20261014') {
-        target = serverBackupPrePhase3;
-      } else {
-        target = serverBackupsList.find(b => b.id === backupIdOrData);
-      }
-    }
-
-    if (!target) {
-      throw new Error('Server backup snapshot not found');
-    }
-
-    const res = await restoreAllData(target);
-    logActivity('RESTORE_SERVER_BACKUP', `Restored company data from server backup snapshot: ${target.title || target.id}`);
-    return { ...res, title: target.title || target.id };
   };
 
   // --- SALES REGISTER (LOCAL DEMO ENVIRONMENT) ---
@@ -2695,37 +2566,8 @@ export function DataProvider({ children }) {
   };
 
   const deleteBranch = (name) => {
-    const clean = name.trim().toUpperCase();
-    setBranches(prev => prev.filter(b => b !== clean));
-    setBranchDetails(prev => {
-      const updated = { ...prev };
-      delete updated[clean];
-      try { localStorage.setItem('rsp_branch_details', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
-    logActivity('DELETE_BRANCH', `Removed branch: ${clean}`);
-  };
-
-  const saveBranchMaster = (branchObj) => {
-    if (!branchObj || !branchObj.code) return;
-    const code = branchObj.code.trim().toUpperCase();
-    setBranches(prev => prev.includes(code) ? prev : [...prev, code]);
-    setBranchDetails(prev => {
-      const updated = { ...prev, [code]: { ...branchObj, code } };
-      try { localStorage.setItem('rsp_branch_details', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
-    logActivity({
-      action: 'SAVE_BRANCH',
-      entityType: 'master',
-      entityId: code,
-      title: `Saved Branch Master: ${branchObj.name || code}`,
-      details: `Code: ${code}, City/Address: ${branchObj.address || 'N/A'}, In-Charge: ${branchObj.inCharge || 'N/A'}`
-    });
-  };
-
-  const removeBranchMaster = (code) => {
-    deleteBranch(code);
+    setBranches(prev => prev.filter(b => b !== name));
+    logActivity('DELETE_BRANCH', `Removed branch: ${name}`);
   };
 
   const addDepartment = (name) => {
@@ -2738,37 +2580,8 @@ export function DataProvider({ children }) {
   };
 
   const deleteDepartment = (name) => {
-    const clean = name.trim().toUpperCase();
-    setDepartments(prev => prev.filter(d => d !== clean));
-    setDepartmentDetails(prev => {
-      const updated = { ...prev };
-      delete updated[clean];
-      try { localStorage.setItem('rsp_department_details', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
-    logActivity('DELETE_DEPARTMENT', `Removed department: ${clean}`);
-  };
-
-  const saveDepartmentMaster = (deptObj) => {
-    if (!deptObj || !deptObj.code) return;
-    const code = deptObj.code.trim().toUpperCase();
-    setDepartments(prev => prev.includes(code) ? prev : [...prev, code]);
-    setDepartmentDetails(prev => {
-      const updated = { ...prev, [code]: { ...deptObj, code } };
-      try { localStorage.setItem('rsp_department_details', JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
-    logActivity({
-      action: 'SAVE_DEPARTMENT',
-      entityType: 'master',
-      entityId: code,
-      title: `Saved Department Master: ${deptObj.name || code}`,
-      details: `Code: ${code}, Head: ${deptObj.inCharge || 'N/A'}`
-    });
-  };
-
-  const removeDepartmentMaster = (code) => {
-    deleteDepartment(code);
+    setDepartments(prev => prev.filter(d => d !== name));
+    logActivity('DELETE_DEPARTMENT', `Removed department: ${name}`);
   };
 
   const addExpenseCategory = (name) => {
@@ -2830,6 +2643,10 @@ export function DataProvider({ children }) {
         markAllBillsAsPaid,
         saveVendor,
         deleteVendor,
+        recordVendorPayment,
+        recordVendorAdvancePayment,
+        updateVendorPayment,
+        deleteVendorPayment,
         saveItem,
         deleteItem,
         syncItemsFromSalesData,
@@ -2882,26 +2699,16 @@ export function DataProvider({ children }) {
         // Dynamic Masters
         branches,
         departments,
-        branchDetails,
-        departmentDetails,
         expenseCategories,
         paymentMethods,
         addBranch,
         deleteBranch,
-        saveBranchMaster,
-        removeBranchMaster,
         addDepartment,
         deleteDepartment,
-        saveDepartmentMaster,
-        removeDepartmentMaster,
         addExpenseCategory,
         deleteExpenseCategory,
         addPaymentMethod,
-        deletePaymentMethod,
-        // Server Backup & Snapshot Engine
-        createLiveServerBackup,
-        restoreServerBackup,
-        serverBackupsList
+        deletePaymentMethod
       }}
 
     >

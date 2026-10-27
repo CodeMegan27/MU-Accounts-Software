@@ -31,7 +31,7 @@ import {
 
 export default function BillsList({ onOpenCreateBill, onEditBill, onViewBill, onOpenPaymentModal, onRequestDelete }) {
   const { bills, vendors, recycleBin, recycleBinCount, restoreBill, permanentDeleteBill } = useData();
-  const { isAdmin } = useAuth();
+  const { isAdmin, openLoginModal } = useAuth();
   const { profile } = useSettings();
   const { showToast } = useToast();
 
@@ -269,6 +269,11 @@ export default function BillsList({ onOpenCreateBill, onEditBill, onViewBill, on
 
   // Permanent Delete Handler
   const handlePermanentDelete = async (id) => {
+    if (!isAdmin) {
+      showToast('Admin access required to permanently delete records', 'error');
+      openLoginModal();
+      return;
+    }
     try {
       await permanentDeleteBill(id);
       showToast('Voucher permanently removed from bin', 'success');
@@ -640,24 +645,20 @@ export default function BillsList({ onOpenCreateBill, onEditBill, onViewBill, on
                         >
                           <CreditCard className="w-4 h-4" />
                         </button>
-                        {isAdmin && (
-                          <>
-                            <button
-                              onClick={() => onEditBill(b.id)}
-                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Edit Bill"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => onRequestDelete('bills', b.id, `Invoice #${b.invoiceNo || b.id}`)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Move to Recycle Bin (3-Day Recovery)"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => onEditBill(b.id)}
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Edit Bill (Admin PIN Required)"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onRequestDelete('bills', b.id, `Invoice #${b.invoiceNo || b.id}`)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Move to Recycle Bin (Admin PIN Required)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -733,15 +734,13 @@ export default function BillsList({ onOpenCreateBill, onEditBill, onViewBill, on
                           <RotateCcw className="w-3.5 h-3.5" />
                           <span>Restore</span>
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => handlePermanentDelete(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Purge permanently"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handlePermanentDelete(item.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Purge permanently (Admin PIN Required)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
