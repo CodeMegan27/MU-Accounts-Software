@@ -84,6 +84,7 @@ export default function ExpenseForm({ expense, onBack }) {
   const [packing, setPacking] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [isRoundOff, setIsRoundOff] = useState(true);
+  const [outstandingAmount, setOutstandingAmount] = useState('');
   
   // Item rows for voucher
   const [items, setItems] = useState([
@@ -111,6 +112,7 @@ export default function ExpenseForm({ expense, onBack }) {
       setPacking(expense.packing || 0);
       setDiscount(expense.discount || 0);
       setIsRoundOff(expense.isRoundOff !== undefined ? expense.isRoundOff : true);
+      setOutstandingAmount(expense.outstandingAmount !== undefined && expense.outstandingAmount !== null ? String(expense.outstandingAmount) : '');
 
       if (expense.items && expense.items.length > 0) {
         setFormMode('voucher');
@@ -254,6 +256,8 @@ export default function ExpenseForm({ expense, onBack }) {
         subtotal: totals.subtotal,
         packing: totals.packing,
         discount: totals.discount,
+        outstandingAmount: parseFloat(outstandingAmount) || 0,
+        totalSettlementAmount: finalAmount + (parseFloat(outstandingAmount) || 0),
         taxAmount: totals.taxAmount,
         cgst: totals.cgst,
         sgst: totals.sgst,
@@ -548,34 +552,66 @@ export default function ExpenseForm({ expense, onBack }) {
 
           {/* If Quick Mode: Single Amount Input */}
           {formMode === 'quick' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Expense Amount (₹) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  disabled={!canEdit}
-                  value={quickAmount}
-                  onChange={(e) => setQuickAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 text-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
-                />
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">
+                    Expense Amount (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    disabled={!canEdit}
+                    value={quickAmount}
+                    onChange={(e) => setQuickAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 text-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Description / Memo</label>
+                  <input
+                    type="text"
+                    disabled={!canEdit}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Optional expense description"
+                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Description / Memo</label>
-                <input
-                  type="text"
-                  disabled={!canEdit}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional expense description"
-                  className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-75"
-                />
+              {/* Outstanding Payable Entry Box (Quick Mode) */}
+              <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <span className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                    Outstanding Payable (+)
+                  </span>
+                  <p className="text-[10px] text-amber-700">Enter previous due/outstanding paid along with this expense</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-36 relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      disabled={!canEdit}
+                      value={outstandingAmount}
+                      onChange={(e) => setOutstandingAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-6 pr-2 py-1.5 bg-white border border-amber-400 rounded-xl text-right font-mono font-bold text-amber-950 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  {parseFloat(outstandingAmount) > 0 && (
+                    <div className="bg-amber-600 text-white px-3 py-1.5 rounded-xl font-mono text-xs font-black shadow-2xs">
+                      Total: ₹{((parseFloat(quickAmount) || 0) + (parseFloat(outstandingAmount) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -868,6 +904,42 @@ export default function ExpenseForm({ expense, onBack }) {
                   <span className="font-extrabold text-red-400 font-mono text-xl">
                     {formatCurrency(totals.grandTotal)}
                   </span>
+                </div>
+
+                {/* Outstanding Payable Entry Box (Voucher Mode) */}
+                <div className="pt-3 border-t border-slate-800 space-y-2">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <div>
+                      <span className="font-bold text-amber-300">Outstanding Payable (+)</span>
+                      <span className="block text-[9px] text-slate-400">Previous balance paid</span>
+                    </div>
+                    <div className="w-36 relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">₹</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={!canEdit}
+                        value={outstandingAmount}
+                        onChange={(e) => setOutstandingAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-6 pr-2 py-1.5 bg-slate-800 border border-amber-500/60 rounded-lg text-right font-mono text-amber-200 font-bold focus:outline-none focus:border-amber-400 disabled:opacity-75"
+                        title="Enter previous outstanding payable amount paid with this expense"
+                      />
+                    </div>
+                  </div>
+
+                  {parseFloat(outstandingAmount) > 0 && (
+                    <div className="p-2.5 bg-amber-950/40 border border-amber-500/30 rounded-xl flex justify-between items-center text-amber-300">
+                      <div>
+                        <span className="font-black text-xs text-white">Total Settlement Amount</span>
+                        <span className="block text-[10px] text-amber-400/80">Expense + Outstanding Paid</span>
+                      </div>
+                      <span className="font-mono text-lg font-black text-amber-300">
+                        {formatCurrency(totals.grandTotal + (parseFloat(outstandingAmount) || 0))}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -21,34 +21,52 @@ import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
 
+// Fast cached ISO date converter to prevent CPU stutter on thousands of records
+const fastDateCache = new Map();
+function getFastDateISO(val) {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (val.length === 10 && val[4] === '-' && val[7] === '-') return val;
+    if (val.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+  }
+  const cached = fastDateCache.get(val);
+  if (cached !== undefined) return cached;
+  const res = normalizeDateToISO(val);
+  fastDateCache.set(val, res);
+  return res;
+}
+
 export default function ProfitAndLoss() {
   const { sales, bills, expenses, daybookTransactions, restoreDefaultSales } = useData();
   const { profile } = useSettings();
   const { showToast } = useToast();
 
-  const [datePeriod, setDatePeriod] = useState('sept2026');
-  const [dateFrom, setDateFrom] = useState('2026-09-01');
-  const [dateTo, setDateTo] = useState('2026-09-30');
-  const [specificDate, setSpecificDate] = useState('');
-
-  // Extract all unique months from sales and bills
+  // Extract all unique months from sales, bills, expenses & daybook
   const availableMonths = useMemo(() => {
     const set = new Set();
-    sales.forEach(s => {
-      const d = s.orderDate || s.invDate || s.date;
-      if (d && d.length >= 7) {
-        const ym = d.substring(0, 7);
+    const addDate = (d) => {
+      const iso = getFastDateISO(d);
+      if (iso && iso.length >= 7) {
+        const ym = iso.substring(0, 7);
         if (/^\d{4}-\d{2}$/.test(ym)) set.add(ym);
       }
-    });
-    bills.forEach(b => {
-      if (b.date && b.date.length >= 7) {
-        const ym = b.date.substring(0, 7);
-        if (/^\d{4}-\d{2}$/.test(ym)) set.add(ym);
-      }
-    });
+    };
+    (sales || []).forEach(s => addDate(s.orderDate || s.invDate || s.date));
+    (bills || []).forEach(b => addDate(b.date));
+    (expenses || []).forEach(e => addDate(e.date));
+    (daybookTransactions || []).forEach(d => addDate(d.date));
     return Array.from(set).sort().reverse();
-  }, [sales, bills]);
+  }, [sales, bills, expenses, daybookTransactions]);
+
+  const latestMonth = availableMonths[0] || '2026-09';
+  const [datePeriod, setDatePeriod] = useState(() => `month_${latestMonth}`);
+  const [dateFrom, setDateFrom] = useState(() => `${latestMonth}-01`);
+  const [dateTo, setDateTo] = useState(() => {
+    const [y, m] = latestMonth.split('-');
+    const lastDay = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate();
+    return `${latestMonth}-${String(lastDay).padStart(2, '0')}`;
+  });
+  const [specificDate, setSpecificDate] = useState('');
 
   // Handle Quick Date Period Change
   const handlePeriodChange = (period) => {
@@ -96,11 +114,11 @@ export default function ProfitAndLoss() {
     }
   };
 
-  // Profit and Loss Aggregations
+  // Profit and Loss Aggregations (Optimized with Fast Date Cache for Instant Live Switching)
   const pnlData = useMemo(() => {
     // 1. Filter Sales within selected period
-    const periodSales = sales.filter(s => {
-      const d = normalizeDateToISO(s.orderDate || s.invDate);
+    const periodSales = (sales || []).filter(s => {
+      const d = getFastDateISO(s.orderDate || s.invDate);
       if (!d) return true;
       if (dateFrom && d < dateFrom) return false;
       if (dateTo && d > dateTo) return false;
@@ -141,8 +159,8 @@ export default function ProfitAndLoss() {
     });
 
     // 2. Filter Purchases within selected period
-    const periodPurchases = bills.filter(b => {
-      const d = normalizeDateToISO(b.date);
+    const periodPurchases = (bills || []).filter(b => {
+      const d = getFastDateISO(b.date);
       if (!d) return true;
       if (dateFrom && d < dateFrom) return false;
       if (dateTo && d > dateTo) return false;
@@ -167,7 +185,7 @@ export default function ProfitAndLoss() {
     let totalOtherIncome = 0;
     const otherIncomesByCategory = {};
     (daybookTransactions || []).forEach(e => {
-      const d = normalizeDateToISO(e.date);
+      const d = getFastDateISO(e.date);
       if (!d) return;
       if (dateFrom && d < dateFrom) return;
       if (dateTo && d > dateTo) return;
@@ -187,8 +205,8 @@ export default function ProfitAndLoss() {
     const grossProfitMargin = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
 
     // 5. Operating Expenses within selected period
-    const periodExpenses = expenses.filter(e => {
-      const d = normalizeDateToISO(e.date);
+    const periodExpenses = (expenses || []).filter(e => {
+      const d = getFastDateISO(e.date);
       if (!d) return true;
       if (dateFrom && d < dateFrom) return false;
       if (dateTo && d > dateTo) return false;
@@ -279,12 +297,15 @@ export default function ProfitAndLoss() {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-indigo-500/10 border border-indigo-500/30 text-indigo-900 p-3 rounded-2xl flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-          <span className="font-extrabold uppercase tracking-wide">Financial Accounts & Profit/Loss Statement</span>
-          <span className="text-slate-500 hidden sm:inline">• Automated reconciliation between Sales, Purchases, and Expenses</span>
+      <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-3 rounded-2xl flex items-center justify-between text-xs shadow-2xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-extrabold uppercase tracking-wide text-emerald-900">Live Real-Time P&L Statement</span>
+          <span className="text-emerald-700 hidden sm:inline">• Reconciled across {pnlData.periodSalesCount} Sales Orders, {pnlData.periodPurchasesCount} Purchases, and {pnlData.periodExpensesCount} Expenses</span>
         </div>
+        <span className="text-[10px] font-mono font-bold bg-white text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full shadow-2xs shrink-0">
+          Live Synced
+        </span>
       </div>
 
 

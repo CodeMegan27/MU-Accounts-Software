@@ -21,7 +21,10 @@ import {
   Building2, 
   CreditCard,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Users
 } from 'lucide-react';
 
 // Helper to extract YYYY-MM safely from diverse date strings
@@ -94,6 +97,19 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
   const [gstr1SupplyType, setGstr1SupplyType] = useState('ALL'); // 'ALL' | 'B2B' | 'B2C'
   const [searchQuery, setSearchQuery] = useState('');
   const [branchFilter, setBranchFilter] = useState('ALL');
+
+  // GSTR-2B View Mode: 'vendors' (vendor-wise summary) | 'bills' (individual bills)
+  const [gstr2bViewMode, setGstr2bViewMode] = useState('vendors');
+  const [expandedVendors, setExpandedVendors] = useState(() => new Set());
+
+  const toggleVendorExpand = (vendorKey) => {
+    setExpandedVendors(prev => {
+      const next = new Set(prev);
+      if (next.has(vendorKey)) next.delete(vendorKey);
+      else next.add(vendorKey);
+      return next;
+    });
+  };
 
   // --- 1. PROCESSED GSTR-1 OUTWARD SUPPLIES DATASET ---
   const gstr1Dataset = useMemo(() => {
@@ -313,6 +329,54 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
     };
   }, [filteredGstr2b]);
 
+  // Vendor-wise aggregated GSTR-2B Input Tax Credit dataset
+  const gstr2bVendorSummary = useMemo(() => {
+    const map = new Map();
+
+    filteredGstr2b.forEach(b => {
+      const key = (b.gstin && b.gstin.trim()) || b.vendorId || b.vendorName || 'UNREGISTERED';
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          gstin: b.gstin || 'UNREGISTERED',
+          vendorName: b.vendorName || 'Unknown Vendor',
+          isB2B: Boolean(b.gstin && b.gstin.length >= 10),
+          isCapitalGoods: Boolean(b.isCapitalGoods),
+          invoiceCount: 0,
+          invoiceTotal: 0,
+          taxable: 0,
+          cgst: 0,
+          sgst: 0,
+          igst: 0,
+          totalTax: 0,
+          invoices: []
+        });
+      }
+
+      const v = map.get(key);
+      v.invoiceCount += 1;
+      v.invoiceTotal += b.grandTotal;
+      v.taxable += b.taxable;
+      v.cgst += b.cgst;
+      v.sgst += b.sgst;
+      v.igst += b.igst;
+      v.totalTax += b.totalTax;
+      v.invoices.push(b);
+    });
+
+    const result = Array.from(map.values()).map(v => ({
+      ...v,
+      invoiceTotal: Math.round(v.invoiceTotal * 100) / 100,
+      taxable: Math.round(v.taxable * 100) / 100,
+      cgst: Math.round(v.cgst * 100) / 100,
+      sgst: Math.round(v.sgst * 100) / 100,
+      igst: Math.round(v.igst * 100) / 100,
+      totalTax: Math.round(v.totalTax * 100) / 100
+    }));
+
+    return result.sort((a, b) => b.totalTax - a.totalTax);
+  }, [filteredGstr2b]);
+
   // --- 3. CONSOLIDATED GSTR-3B RETURN COMPUTATION ---
   // Uses month-scoped datasets without text search filter
   const gstr3bComputation = useMemo(() => {
@@ -469,35 +533,116 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
     showToast('GSTR-1 Outward Supplies Excel exported!', 'success');
   };
 
-  // Export GSTR-2B
+  // Export GSTR-2B (Official Government GST Portal Format + Vendor-wise Summary)
   const handleExportGstr2bExcel = () => {
     if (filteredGstr2b.length === 0) {
       showToast('No GSTR-2B purchase records found for this period', 'error');
       return;
     }
 
-    const rows = filteredGstr2b.map(b => ({
-      "Supplier GSTIN": b.gstin,
-      "Supplier Legal Name": b.vendorName,
-      "Invoice Number": b.invoiceNo,
-      "Invoice Date": b.date,
-      "ITC Nature / Category": b.isCapitalGoods ? 'Capital Goods' : 'Inputs / Services',
-      "Asset / Description": b.assetName || 'General Inputs',
-      "Invoice Value (₹)": b.grandTotal,
-      "Taxable Value (₹)": b.taxable,
-      "GST Rate (%)": b.taxRate,
-      "Integrated Tax (IGST ₹)": b.igst,
-      "Central Tax (CGST ₹)": b.cgst,
-      "State Tax (SGST ₹)": b.sgst,
-      "Total ITC Claimable (₹)": b.totalTax,
-      "Supply Type": b.isInterState ? 'Inter-State' : 'Intra-State'
-    }));
+    const formatPeriodLabel = (ym) => {
+      if (!ym) return '';
+      const parts = ym.split('-');
+      if (parts.length < 2) return ym;
+      const [y, m] = parts;
+      const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }).replace(' ', "'");
+    };
 
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "GSTR-2B ITC");
-    XLSX.writeFile(wb, `GSTR2B_Inward_Supplies_${selectedMonth || 'All'}.xlsx`);
-    showToast('GSTR-2B Input Tax Credit Excel exported!', 'success');
+
+    // 1. Official B2B Sheet (21 official GST Portal columns)
+    const b2bRows = filteredGstr2b.map(b => ({
+      "GSTIN of supplier": b.gstin || '',
+      "Trade/Legal name": b.vendorName || '',
+      "Invoice number": b.invoiceNo || '',
+      "Invoice type": "Regular",
+      "Invoice Date": formatDate(b.date),
+      "Invoice Value(₹)": b.grandTotal,
+      "Place of supply": b.isInterState ? "Other State" : "33-Tamil Nadu",
+      "Supply Attract Reverse Charge": "No",
+      "Taxable Value (₹)": b.taxable,
+      "Integrated Tax(₹)": b.igst,
+      "Central Tax(₹)": b.cgst,
+      "State/UT Tax(₹)": b.sgst,
+      "Cess(₹)": 0,
+      "GSTR-1/1A/IFF/GSTR-5 Period": formatPeriodLabel(b.yearMonth || selectedMonth),
+      "GSTR-1/1A/IFF/GSTR-5 Filing Date": formatDate(b.date),
+      "ITC Availability": "Yes",
+      "Reason": "",
+      "Applicable % of Tax Rate": `${b.taxRate || 18}%`,
+      "Source": "GSTR-1",
+      "IRN": "",
+      "IRN Date": ""
+    }));
+
+    const wsB2B = XLSX.utils.json_to_sheet(b2bRows);
+    XLSX.utils.book_append_sheet(wb, wsB2B, "B2B");
+
+    // 2. Vendor-wise Summary Sheet
+    const vendorSummaryRows = gstr2bVendorSummary.map(v => ({
+      "GSTIN of supplier": v.gstin,
+      "Trade/Legal name": v.vendorName,
+      "Total Inward Invoices": v.invoiceCount,
+      "Total Invoice Value (₹)": v.invoiceTotal,
+      "Taxable Value (₹)": v.taxable,
+      "Central Tax CGST (₹)": v.cgst,
+      "State Tax SGST (₹)": v.sgst,
+      "Integrated Tax IGST (₹)": v.igst,
+      "Total Input Tax Credit (ITC ₹)": v.totalTax
+    }));
+
+    // Add total row at bottom
+    vendorSummaryRows.push({
+      "GSTIN of supplier": "TOTAL",
+      "Trade/Legal name": `${gstr2bVendorSummary.length} Registered Suppliers`,
+      "Total Inward Invoices": gstr2bTotals.count,
+      "Total Invoice Value (₹)": gstr2bTotals.invoiceTotal,
+      "Taxable Value (₹)": gstr2bTotals.taxable,
+      "Central Tax CGST (₹)": gstr2bTotals.cgst,
+      "State Tax SGST (₹)": gstr2bTotals.sgst,
+      "Integrated Tax IGST (₹)": gstr2bTotals.igst,
+      "Total Input Tax Credit (ITC ₹)": gstr2bTotals.totalTax
+    });
+
+    const wsVendor = XLSX.utils.json_to_sheet(vendorSummaryRows);
+    XLSX.utils.book_append_sheet(wb, wsVendor, "Vendor-wise Summary");
+
+    // 3. Official Summary Sheet: ITC Available (Table 4(A)(5))
+    const itcSummaryData = [
+      ["FORM GSTR-2B SUMMARY - INPUT TAX CREDIT AVAILABLE"],
+      ["Generated Period", selectedMonth || 'All Months'],
+      ["Taxpayer Name", profile.businessName || 'RS Purchase Enterprise'],
+      ["Taxpayer GSTIN", profile.gstin || '33BLGPM9171A1ZA'],
+      [""],
+      ["S.No", "Heading / Category", "GSTR-3B Table", "Integrated Tax (₹)", "Central Tax (₹)", "State/UT Tax (₹)", "Cess (₹)", "Total ITC Claimable (₹)"],
+      [
+        "1",
+        "Part A - Inward Supplies from Registered Suppliers (Other than Reverse Charge)",
+        "Table 4(A)(5)",
+        gstr2bTotals.igst,
+        gstr2bTotals.cgst,
+        gstr2bTotals.sgst,
+        0,
+        gstr2bTotals.totalTax
+      ],
+      [
+        "",
+        "TOTAL ELIGIBLE ITC AVAILABLE",
+        "Table 4(A)",
+        gstr2bTotals.igst,
+        gstr2bTotals.cgst,
+        gstr2bTotals.sgst,
+        0,
+        gstr2bTotals.totalTax
+      ]
+    ];
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(itcSummaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "ITC Available");
+
+    XLSX.writeFile(wb, `GSTR2B_Official_${selectedMonth || 'All'}.xlsx`);
+    showToast('Official GSTR-2B Excel with B2B & Vendor-wise Summary exported!', 'success');
   };
 
   // Export GSTR-3B
@@ -979,95 +1124,327 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
             </div>
           </div>
 
-          {/* Search Box */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
-            <div className="relative w-full max-w-sm">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search vendor, supplier GSTIN, invoice #..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+          {/* Controls: Search, View Switcher & Export */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* View Switcher: Vendor-wise vs Bill-wise */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setGstr2bViewMode('vendors')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    gstr2bViewMode === 'vendors'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Vendor-wise Summary</span>
+                  <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-mono">
+                    {gstr2bVendorSummary.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGstr2bViewMode('bills')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    gstr2bViewMode === 'bills'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Bill-wise Invoices</span>
+                  <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+                    {filteredGstr2b.length}
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search vendor, GSTIN, invoice #..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
             </div>
+
             <button
               onClick={handleExportGstr2bExcel}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors"
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs shrink-0 cursor-pointer"
+              title="Download official multi-sheet GSTR-2B with B2B & Vendor-wise tables"
             >
-              <Download className="w-3.5 h-3.5" /> Download GSTR-2B Excel
+              <Download className="w-3.5 h-3.5" /> Official GSTR-2B Excel
             </button>
           </div>
 
-          {/* Tax Breakdown Table */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">B2B Inward Supply Transactions</h3>
-                <p className="text-xs text-slate-500">Auto-populated for GSTR-3B Table 4(A)(5) Input Tax Credit claim</p>
+          {/* 1. Vendor-wise Summary View */}
+          {gstr2bViewMode === 'vendors' && (
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <span>Vendor-wise Inward ITC Summary</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Aggregated by registered supplier to identify total input tax credit claim per vendor</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  {gstr2bVendorSummary.length} Registered Suppliers
+                </span>
               </div>
-              <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                {filteredGstr2b.length} Purchase Bills
-              </span>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
-                    <th className="px-5 py-3">Date</th>
-                    <th className="px-5 py-3">Supplier GSTIN</th>
-                    <th className="px-5 py-3">Supplier Name</th>
-                    <th className="px-5 py-3">Invoice No</th>
-                    <th className="px-5 py-3">ITC Category</th>
-                    <th className="px-5 py-3 text-right">Taxable (₹)</th>
-                    <th className="px-5 py-3 text-right">Rate</th>
-                    <th className="px-5 py-3 text-right">CGST (₹)</th>
-                    <th className="px-5 py-3 text-right">SGST (₹)</th>
-                    <th className="px-5 py-3 text-right">IGST (₹)</th>
-                    <th className="px-5 py-3 text-right font-extrabold text-slate-900">Total ITC (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredGstr2b.length === 0 ? (
-                    <tr>
-                      <td colSpan="11" className="text-center py-12 text-slate-400">
-                        No GST registered inward supplies recorded for this period.
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-black uppercase tracking-wider border-b border-slate-200 text-[11px]">
+                      <th className="px-4 py-3 w-8"></th>
+                      <th className="px-4 py-3">Supplier GSTIN</th>
+                      <th className="px-4 py-3">Supplier Legal Name</th>
+                      <th className="px-4 py-3 text-center">Invoices</th>
+                      <th className="px-4 py-3 text-right">Invoice Value (₹)</th>
+                      <th className="px-4 py-3 text-right">Taxable Base (₹)</th>
+                      <th className="px-4 py-3 text-right">CGST (₹)</th>
+                      <th className="px-4 py-3 text-right">SGST (₹)</th>
+                      <th className="px-4 py-3 text-right">IGST (₹)</th>
+                      <th className="px-4 py-3 text-right font-black text-slate-900">Total Claimable ITC (₹)</th>
                     </tr>
-                  ) : (
-                    filteredGstr2b.map(b => (
-                      <tr key={b.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-5 py-3 font-mono text-slate-600">{formatDate(b.date)}</td>
-                        <td className="px-5 py-3 font-mono font-bold text-slate-800">{b.gstin || '-'}</td>
-                        <td className="px-5 py-3 font-medium text-slate-800 max-w-[200px] truncate">{b.vendorName || '-'}</td>
-                        <td className="px-5 py-3 font-mono font-semibold text-slate-900">{b.invoiceNo || '-'}</td>
-                        <td className="px-5 py-3">
-                          {b.isCapitalGoods ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-900 border border-purple-200" title={`Asset: ${b.assetName}`}>
-                              Capital Goods
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">
-                              Inputs / Services
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3 text-right font-mono font-medium">{formatCurrency(b.taxable)}</td>
-                        <td className="px-5 py-3 text-right font-mono">{b.taxRate || 0}%</td>
-                        <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.cgst)}</td>
-                        <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.sgst)}</td>
-                        <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.igst)}</td>
-                        <td className="px-5 py-3 text-right font-mono font-bold text-emerald-700">
-                          {formatCurrency(b.totalTax)}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {gstr2bVendorSummary.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" className="text-center py-12 text-slate-400">
+                          No registered vendor inward supplies found for this period.
                         </td>
                       </tr>
-                    ))
+                    ) : (
+                      gstr2bVendorSummary.map(v => {
+                        const isExpanded = expandedVendors.has(v.key);
+                        return (
+                          <React.Fragment key={v.key}>
+                            <tr 
+                              onClick={() => toggleVendorExpand(v.key)}
+                              className="hover:bg-emerald-50/40 transition-colors cursor-pointer group"
+                            >
+                              <td className="px-4 py-3 text-center text-slate-400 group-hover:text-emerald-600">
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </td>
+                              <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/80">
+                                  {v.gstin}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-slate-900 max-w-[240px] truncate">
+                                {v.vendorName}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  {v.invoiceCount} {v.invoiceCount === 1 ? 'Bill' : 'Bills'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">
+                                {formatCurrency(v.invoiceTotal)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-slate-700">
+                                {formatCurrency(v.taxable)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-slate-600">
+                                {formatCurrency(v.cgst)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-slate-600">
+                                {formatCurrency(v.sgst)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-slate-600">
+                                {formatCurrency(v.igst)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-black text-emerald-700 text-sm">
+                                {formatCurrency(v.totalTax)}
+                              </td>
+                            </tr>
+
+                            {/* Expanded Invoices Sub-Table */}
+                            {isExpanded && (
+                              <tr className="bg-slate-50/80 border-y border-emerald-100">
+                                <td colSpan="10" className="p-3 sm:px-8">
+                                  <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                                      <span>Inward Bills from {v.vendorName} ({v.gstin})</span>
+                                      <span className="text-emerald-700">Total Vendor ITC: {formatCurrency(v.totalTax)}</span>
+                                    </div>
+                                    <table className="min-w-full divide-y divide-slate-100 text-[11px]">
+                                      <thead className="bg-slate-50 text-slate-500 font-bold">
+                                        <tr>
+                                          <th className="px-3 py-1.5 text-left">Invoice No</th>
+                                          <th className="px-3 py-1.5 text-left">Date</th>
+                                          <th className="px-3 py-1.5 text-left">Category</th>
+                                          <th className="px-3 py-1.5 text-right">Invoice Value</th>
+                                          <th className="px-3 py-1.5 text-right">Taxable</th>
+                                          <th className="px-3 py-1.5 text-right">CGST</th>
+                                          <th className="px-3 py-1.5 text-right">SGST</th>
+                                          <th className="px-3 py-1.5 text-right">IGST</th>
+                                          <th className="px-3 py-1.5 text-right font-bold text-slate-800">ITC Claim</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-50 font-mono">
+                                        {v.invoices.map(inv => (
+                                          <tr key={inv.id} className="hover:bg-slate-50">
+                                            <td className="px-3 py-1 font-bold text-slate-900">{inv.invoiceNo}</td>
+                                            <td className="px-3 py-1 text-slate-600">{formatDate(inv.date)}</td>
+                                            <td className="px-3 py-1 font-sans text-[10px]">
+                                              {inv.isCapitalGoods ? (
+                                                <span className="px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded font-bold">Capital Goods</span>
+                                              ) : (
+                                                <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">Inputs</span>
+                                              )}
+                                            </td>
+                                            <td className="px-3 py-1 text-right text-slate-800">{formatCurrency(inv.grandTotal)}</td>
+                                            <td className="px-3 py-1 text-right text-slate-700">{formatCurrency(inv.taxable)}</td>
+                                            <td className="px-3 py-1 text-right text-slate-600">{formatCurrency(inv.cgst)}</td>
+                                            <td className="px-3 py-1 text-right text-slate-600">{formatCurrency(inv.sgst)}</td>
+                                            <td className="px-3 py-1 text-right text-slate-600">{formatCurrency(inv.igst)}</td>
+                                            <td className="px-3 py-1 text-right font-bold text-emerald-700">{formatCurrency(inv.totalTax)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {gstr2bVendorSummary.length > 0 && (
+                    <tfoot className="bg-slate-100/90 font-black text-slate-900 border-t-2 border-slate-300">
+                      <tr>
+                        <td className="px-4 py-3"></td>
+                        <td className="px-4 py-3" colSpan="2">
+                          TOTAL ({gstr2bVendorSummary.length} Registered Suppliers)
+                        </td>
+                        <td className="px-4 py-3 text-center font-mono">
+                          {gstr2bTotals.count} Bills
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {formatCurrency(gstr2bTotals.invoiceTotal)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {formatCurrency(gstr2bTotals.taxable)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {formatCurrency(gstr2bTotals.cgst)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {formatCurrency(gstr2bTotals.sgst)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {formatCurrency(gstr2bTotals.igst)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-emerald-700 text-sm">
+                          {formatCurrency(gstr2bTotals.totalTax)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   )}
-                </tbody>
-              </table>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 2. Bill-wise Invoices View */}
+          {gstr2bViewMode === 'bills' && (
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <span>B2B Inward Supply Transactions (All Invoices)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Individual invoice lines for GSTR-3B Table 4(A)(5) Input Tax Credit claim</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  {filteredGstr2b.length} Purchase Bills
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                      <th className="px-5 py-3">Date</th>
+                      <th className="px-5 py-3">Supplier GSTIN</th>
+                      <th className="px-5 py-3">Supplier Name</th>
+                      <th className="px-5 py-3">Invoice No</th>
+                      <th className="px-5 py-3">ITC Category</th>
+                      <th className="px-5 py-3 text-right">Taxable (₹)</th>
+                      <th className="px-5 py-3 text-right">Rate</th>
+                      <th className="px-5 py-3 text-right">CGST (₹)</th>
+                      <th className="px-5 py-3 text-right">SGST (₹)</th>
+                      <th className="px-5 py-3 text-right">IGST (₹)</th>
+                      <th className="px-5 py-3 text-right font-extrabold text-slate-900">Total ITC (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {filteredGstr2b.length === 0 ? (
+                      <tr>
+                        <td colSpan="11" className="text-center py-12 text-slate-400">
+                          No GST registered inward supplies recorded for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredGstr2b.map(b => (
+                        <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-slate-600">{formatDate(b.date)}</td>
+                          <td className="px-5 py-3 font-mono font-bold text-slate-800">{b.gstin || '-'}</td>
+                          <td className="px-5 py-3 font-medium text-slate-800 max-w-[200px] truncate">{b.vendorName || '-'}</td>
+                          <td className="px-5 py-3 font-mono font-semibold text-slate-900">{b.invoiceNo || '-'}</td>
+                          <td className="px-5 py-3">
+                            {b.isCapitalGoods ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-900 border border-purple-200" title={`Asset: ${b.assetName}`}>
+                                Capital Goods
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">
+                                Inputs / Services
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-right font-mono font-medium">{formatCurrency(b.taxable)}</td>
+                          <td className="px-5 py-3 text-right font-mono">{b.taxRate || 0}%</td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.cgst)}</td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.sgst)}</td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-600">{formatCurrency(b.igst)}</td>
+                          <td className="px-5 py-3 text-right font-mono font-bold text-emerald-700">
+                            {formatCurrency(b.totalTax)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {filteredGstr2b.length > 0 && (
+                    <tfoot className="bg-slate-100 font-bold text-slate-900 border-t border-slate-200">
+                      <tr>
+                        <td className="px-5 py-3" colSpan="5">TOTAL ({filteredGstr2b.length} Inward Invoices)</td>
+                        <td className="px-5 py-3 text-right font-mono">{formatCurrency(gstr2bTotals.taxable)}</td>
+                        <td className="px-5 py-3"></td>
+                        <td className="px-5 py-3 text-right font-mono">{formatCurrency(gstr2bTotals.cgst)}</td>
+                        <td className="px-5 py-3 text-right font-mono">{formatCurrency(gstr2bTotals.sgst)}</td>
+                        <td className="px-5 py-3 text-right font-mono">{formatCurrency(gstr2bTotals.igst)}</td>
+                        <td className="px-5 py-3 text-right font-mono text-emerald-700 font-extrabold">
+                          {formatCurrency(gstr2bTotals.totalTax)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

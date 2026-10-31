@@ -63,15 +63,18 @@ export function calculateBillTotals({
   taxType = 'exclusive',
   taxRate = 18,
   isInterState = false,
-  isRoundOff = true
+  isRoundOff = true,
+  customSubtotal = null
 }) {
-  let subtotal = 0;
+  let calculatedSubtotal = 0;
   
   const processedItems = items.map(item => {
     const qty = parseFloat(item.qty) || 0;
     const rate = parseFloat(item.rate) || 0;
-    const amount = qty * rate;
-    subtotal += amount;
+    // Respect manually altered line item amount if specified
+    const hasManualAmount = item.amount !== undefined && item.amount !== null && item.amount !== '' && !isNaN(parseFloat(item.amount));
+    const amount = hasManualAmount ? parseFloat(parseFloat(item.amount).toFixed(2)) : parseFloat((qty * rate).toFixed(2));
+    calculatedSubtotal += amount;
     return {
       ...item,
       qty,
@@ -79,6 +82,11 @@ export function calculateBillTotals({
       amount
     };
   });
+
+  // Use customSubtotal if manually entered, otherwise use calculated sum
+  const subtotal = customSubtotal !== null && customSubtotal !== undefined && customSubtotal !== '' && !isNaN(parseFloat(customSubtotal))
+    ? parseFloat(parseFloat(customSubtotal).toFixed(2))
+    : calculatedSubtotal;
 
   const p = parseFloat(packing) || 0;
   const d = parseFloat(discount) || 0;

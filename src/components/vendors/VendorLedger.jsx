@@ -35,6 +35,7 @@ import VendorEditModal from './VendorEditModal';
 export default function VendorLedger({ 
   vendor, 
   onBack, 
+  onCreateBill,
   onViewBill, 
   onEditBill, 
   onEditExpense, 
@@ -499,6 +500,17 @@ export default function VendorLedger({
         </button>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+          {/* Add Purchase Bill Button */}
+          {onCreateBill && (
+            <button
+              onClick={() => onCreateBill(currentVendor)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+              title="Add a new purchase invoice for this vendor"
+            >
+              <FileText className="w-4 h-4" /> Add Purchase Bill
+            </button>
+          )}
+
           {/* Record Payment Button */}
           <button
             onClick={() => handleOpenPayment(null)}

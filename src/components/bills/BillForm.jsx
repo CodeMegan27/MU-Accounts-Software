@@ -63,6 +63,8 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
   const [packing, setPacking] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [isRoundOff, setIsRoundOff] = useState(true);
+  const [customSubtotal, setCustomSubtotal] = useState('');
+  const [outstandingAmount, setOutstandingAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
     { name: '', uqc: 'NOS', qty: 1, rate: 0, amount: 0 }
@@ -85,6 +87,8 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
     if (draft.packing !== undefined) setPacking(draft.packing);
     if (draft.discount !== undefined) setDiscount(draft.discount);
     if (draft.isRoundOff !== undefined) setIsRoundOff(draft.isRoundOff);
+    if (draft.customSubtotal !== undefined) setCustomSubtotal(draft.customSubtotal);
+    if (draft.outstandingAmount !== undefined) setOutstandingAmount(draft.outstandingAmount);
     if (draft.items && draft.items.length > 0) setItems(draft.items);
     if (draft._draftId) setActiveDraftId(draft._draftId);
     if (draft._draftNumber) setActiveDraftNumber(draft._draftNumber);
@@ -131,6 +135,8 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
       setPacking(existingBill.packing || 0);
       setDiscount(existingBill.discount || 0);
       setIsRoundOff(existingBill.isRoundOff !== undefined ? existingBill.isRoundOff : true);
+      setCustomSubtotal(existingBill.customSubtotal !== undefined && existingBill.customSubtotal !== null ? String(existingBill.customSubtotal) : '');
+      setOutstandingAmount(existingBill.outstandingAmount !== undefined && existingBill.outstandingAmount !== null ? String(existingBill.outstandingAmount) : '');
       setNotes(existingBill.notes || '');
       if (existingBill.items && existingBill.items.length > 0) {
         setItems(existingBill.items.map(i => {
@@ -230,7 +236,18 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
     return isInterStateSupply(profile.gstin, gstin, profile.stateCode || "33");
   }, [profile.gstin, profile.stateCode, gstin]);
 
-  // Recalculate totals with Round Off
+  // Vendor's current outstanding balance from system
+  const vendorOutstanding = useMemo(() => {
+    if (!vendorId) return 0;
+    const v = vendors.find(x => x.id === vendorId);
+    let bal = parseFloat(v?.openingBalance) || 0;
+    bills.filter(b => b.vendorId === vendorId && b.id !== billId).forEach(b => {
+      bal += (parseFloat(b.balanceAmount !== undefined ? b.balanceAmount : b.grandTotal) || 0);
+    });
+    return Math.max(0, bal);
+  }, [vendorId, vendors, bills, billId]);
+
+  // Recalculate totals with Round Off and optional custom/editable subtotal
   const totals = useMemo(() => {
     return calculateBillTotals({
       items,
@@ -240,9 +257,17 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
       taxType,
       taxRate,
       isInterState,
-      isRoundOff
+      isRoundOff,
+      customSubtotal
     });
-  }, [items, packing, discount, isGst, taxType, taxRate, isInterState, isRoundOff]);
+  }, [items, packing, discount, isGst, taxType, taxRate, isInterState, isRoundOff, customSubtotal]);
+
+  // Total Settlement Amount (Current Bill + Outstanding Payable)
+  const totalWithOutstanding = useMemo(() => {
+    const billTotal = parseFloat(totals.grandTotal) || 0;
+    const outAmt = parseFloat(outstandingAmount) || 0;
+    return billTotal + outAmt;
+  }, [totals.grandTotal, outstandingAmount]);
 
   // Auto-Save Effect (Debounced 1000ms) - Silently preserves draft in localStorage without activity log spam
   useEffect(() => {
@@ -262,6 +287,9 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
         packing,
         discount,
         isRoundOff,
+        customSubtotal: customSubtotal !== '' && customSubtotal !== null ? parseFloat(customSubtotal) : null,
+        outstandingAmount: parseFloat(outstandingAmount) || 0,
+        totalSettlementAmount: totalWithOutstanding,
         notes,
         items,
         grandTotal: totals.grandTotal
@@ -279,7 +307,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
     return () => clearTimeout(timer);
   }, [
     isEditing, activeDraftId, activeDraftNumber, date, invoiceNo, vendorId, vendorName, isGst, gstin,
-    taxType, taxRate, packing, discount, isRoundOff, notes, items, totals.grandTotal
+    taxType, taxRate, packing, discount, isRoundOff, customSubtotal, outstandingAmount, totalWithOutstanding, notes, items, totals.grandTotal
   ]);
 
   const handleManualSaveDraft = () => {
@@ -297,6 +325,9 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
       packing,
       discount,
       isRoundOff,
+      customSubtotal: customSubtotal !== '' && customSubtotal !== null ? parseFloat(customSubtotal) : null,
+      outstandingAmount: parseFloat(outstandingAmount) || 0,
+      totalSettlementAmount: totalWithOutstanding,
       notes,
       items,
       grandTotal: totals.grandTotal
@@ -391,6 +422,9 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
         packing: totals.packing,
         discount: totals.discount,
         subtotal: totals.subtotal,
+        customSubtotal: customSubtotal !== '' && customSubtotal !== null ? parseFloat(customSubtotal) : null,
+        outstandingAmount: parseFloat(outstandingAmount) || 0,
+        totalSettlementAmount: totalWithOutstanding,
         taxableBase: totals.taxableBase,
         taxAmount: totals.taxAmount,
         cgst: totals.cgst,
@@ -961,8 +995,34 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
           {/* Pricing Calculation Card */}
           <div className="w-full lg:w-1/2 bg-slate-900 text-white p-6 rounded-2xl shadow-xl space-y-3 text-xs">
             <div className="flex justify-between items-center text-slate-300">
-              <span>Item Subtotal</span>
-              <span className="font-bold text-white font-mono text-sm">{formatCurrency(totals.subtotal)}</span>
+              <div className="flex items-center gap-1.5">
+                <span>Item Subtotal</span>
+                {customSubtotal !== '' && customSubtotal !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomSubtotal('')}
+                    className="text-[9px] text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                    title="Reset to automatic item sum"
+                  >
+                    (Auto-Calc)
+                  </button>
+                )}
+              </div>
+              <div className="w-36 relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  disabled={!canEdit}
+                  value={customSubtotal !== '' && customSubtotal !== null ? customSubtotal : totals.subtotal.toFixed(2)}
+                  onChange={(e) => setCustomSubtotal(e.target.value)}
+                  className={`w-full pl-6 pr-2 py-1 bg-slate-800 border rounded-lg text-right font-mono text-white focus:outline-none focus:border-brand-500 disabled:opacity-75 ${
+                    customSubtotal !== '' && customSubtotal !== null ? 'border-amber-400 text-amber-200 font-bold' : 'border-slate-700'
+                  }`}
+                  placeholder="0.00"
+                  title="Item subtotal is editable. Edit here or line items to alter"
+                />
+              </div>
             </div>
 
             <div className="flex justify-between items-center text-slate-300">
@@ -1035,7 +1095,7 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
 
             <div className="pt-3 border-t border-slate-700 flex justify-between items-center text-base">
               <div>
-                <span className="font-extrabold text-white">Grand Total</span>
+                <span className="font-extrabold text-white">Grand Total (Bill)</span>
                 {isRoundOff && (
                   <span className="block text-[10px] text-slate-400 font-normal">Rounded to nearest ₹</span>
                 )}
@@ -1043,6 +1103,46 @@ export default function BillForm({ billId, draftBill, onBack, onQuickAddVendor, 
               <span className="font-extrabold text-brand-400 font-mono text-xl">
                 {formatCurrency(totals.grandTotal)}
               </span>
+            </div>
+
+            {/* Outstanding Payable Entry Box */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <div className="flex justify-between items-center text-slate-300">
+                <div>
+                  <span className="font-bold text-amber-300">Outstanding Payable (+)</span>
+                  {vendorOutstanding > 0 && (
+                    <span className="block text-[10px] text-slate-400 font-mono">
+                      Current Due: ₹{vendorOutstanding.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+                <div className="w-36 relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    disabled={!canEdit}
+                    value={outstandingAmount}
+                    onChange={(e) => setOutstandingAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-6 pr-2 py-1.5 bg-slate-800 border border-amber-500/60 rounded-lg text-right font-mono text-amber-200 font-bold focus:outline-none focus:border-amber-400 disabled:opacity-75"
+                    title="Enter previous outstanding payable amount paid with this bill"
+                  />
+                </div>
+              </div>
+
+              {parseFloat(outstandingAmount) > 0 && (
+                <div className="p-2.5 bg-amber-950/40 border border-amber-500/30 rounded-xl flex justify-between items-center text-amber-300">
+                  <div>
+                    <span className="font-black text-xs text-white">Total Settlement Amount</span>
+                    <span className="block text-[10px] text-amber-400/80">Bill Total + Outstanding Paid</span>
+                  </div>
+                  <span className="font-mono text-lg font-black text-amber-300">
+                    {formatCurrency(totalWithOutstanding)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

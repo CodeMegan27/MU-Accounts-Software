@@ -108,10 +108,17 @@ function AppContent() {
 
 
   // Bill Actions
-  const handleOpenCreateBill = () => {
+  const handleOpenCreateBill = (prefilledVendor = null, source = 'bills') => {
     setActiveBillId(null);
     const newDraft = createNewDraft('bill');
+    if (prefilledVendor) {
+      newDraft.vendorId = prefilledVendor.id || '';
+      newDraft.vendorName = prefilledVendor.name || '';
+      newDraft.gstin = prefilledVendor.gstin || '';
+      newDraft.isGst = prefilledVendor.gstStatus === 'GST';
+    }
     setActiveBillDraft(newDraft);
+    setBillSourceTab(source);
     setActiveTab('createBill');
   };
 
@@ -433,6 +440,7 @@ function AppContent() {
             <VendorLedger
               vendor={currentActiveVendor}
               onBack={() => handleSelectTab('vendors')}
+              onCreateBill={(v) => handleOpenCreateBill(v, 'vendorLedger')}
               onViewBill={(id) => handleViewBill(id, 'vendorLedger')}
               onEditBill={(id) => handleEditBill(id, 'vendorLedger')}
               onEditExpense={handleEditExpense}
