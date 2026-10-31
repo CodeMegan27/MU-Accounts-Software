@@ -724,7 +724,7 @@ export default function ExpenseForm({ expense, onBack }) {
                             disabled={!canEdit}
                             value={item.name}
                             onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                            placeholder="e.g. Monthly Office Rent for September"
+                            placeholder="e.g. Monthly Office Rent / Maintenance"
                             className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 font-medium text-slate-800 disabled:opacity-75"
                           />
                         </td>

@@ -68,10 +68,10 @@ export default function VoucherRegister() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  // Date Filtering: 'sept2026' | 'specific' | 'dayOfMonth' | 'custom' | 'today' | 'thisMonth' | 'lastMonth' | 'all'
-  const [datePeriod, setDatePeriod] = useState('sept2026');
-  const [dateFrom, setDateFrom] = useState('2026-09-01');
-  const [dateTo, setDateTo] = useState('2026-09-30');
+  // Date Filtering: 'all' | 'thisMonth' | 'today' | 'lastMonth' | 'specific' | 'dayOfMonth' | 'custom'
+  const [datePeriod, setDatePeriod] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [specificDate, setSpecificDate] = useState('');
   const [selectedDay, setSelectedDay] = useState('12');
 
@@ -104,7 +104,7 @@ export default function VoucherRegister() {
       setDateTo('');
       setSpecificDate('');
     } else if (period === 'specific') {
-      const initial = specificDate || dateFrom || '2026-09-01';
+      const initial = specificDate || dateFrom || toISO(today);
       setSpecificDate(initial);
       setDateFrom(initial);
       setDateTo(initial);
@@ -117,10 +117,6 @@ export default function VoucherRegister() {
       setDateFrom(d);
       setDateTo(d);
       setSpecificDate(d);
-    } else if (period === 'sept2026') {
-      setDateFrom('2026-09-01');
-      setDateTo('2026-09-30');
-      setSpecificDate('');
     } else if (period === 'thisMonth') {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);
       const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -976,14 +972,13 @@ export default function VoucherRegister() {
               onChange={(e) => handlePeriodChange(e.target.value)}
               className="w-full py-2 px-3 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs font-bold text-indigo-950 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
-              <option value="sept2026">⭐ September 2026</option>
+              <option value="all">🌐 Full History (All Transactions)</option>
+              <option value="thisMonth">📅 This Month</option>
+              <option value="today">⚡ Today</option>
+              <option value="lastMonth">📅 Last Month</option>
               <option value="specific">🎯 Specific Date (Exact Day)</option>
-              <option value="dayOfMonth">📅 Day of Month (Filter All Months)</option>
-              <option value="today">Today</option>
-              <option value="thisMonth">This Month</option>
-              <option value="lastMonth">Last Month</option>
-              <option value="custom">Custom Date Range...</option>
-              <option value="all">Full History (All Months)</option>
+              <option value="dayOfMonth">📆 Day of Month (Filter All Months)</option>
+              <option value="custom">⚙️ Custom Date Range...</option>
             </select>
           </div>
         </div>
@@ -1027,7 +1022,7 @@ export default function VoucherRegister() {
               ))}
             </select>
             <span className="text-amber-800 text-[11px] font-medium">
-              Filters all records across <strong>August, September, October, and all other months</strong> on the <strong>{selectedDay}th</strong>!
+              Filters all records across all months on the <strong>{selectedDay}th</strong>!
             </span>
           </div>
         )}

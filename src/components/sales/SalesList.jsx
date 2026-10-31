@@ -112,7 +112,7 @@ export default function SalesList({ defaultMode = 'orders', onNewSale, onViewSal
       setDateTo('');
       setSpecificDate('');
     } else if (preset === 'specific') {
-      const initial = specificDate || dateFrom || '2026-09-01';
+      const initial = specificDate || dateFrom || toISO(today);
       setSpecificDate(initial);
       setDateFrom(initial);
       setDateTo(initial);
@@ -146,10 +146,6 @@ export default function SalesList({ defaultMode = 'orders', onNewSale, onViewSal
       const lastDay = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate();
       setDateFrom(`${ym}-01`);
       setDateTo(`${ym}-${String(lastDay).padStart(2, '0')}`);
-      setSpecificDate('');
-    } else if (preset === 'sept2026') {
-      setDateFrom('2026-09-01');
-      setDateTo('2026-09-30');
       setSpecificDate('');
     }
   };
@@ -1097,10 +1093,10 @@ export default function SalesList({ defaultMode = 'orders', onNewSale, onViewSal
                 onClick={() => {
                   const count = restoreDefaultSales();
                   setShowResetConfirm(false);
-                  showToast(`Reloaded original ${count} September 2026 sales orders!`, 'success');
+                  showToast(`Reloaded original ${count} sample demo sales orders!`, 'success');
                 }}
                 className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-all"
-                title="Restore default September demo dataset"
+                title="Restore default sample demo dataset"
               >
                 Reset to Default Demo
               </button>

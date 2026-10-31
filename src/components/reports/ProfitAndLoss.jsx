@@ -58,7 +58,7 @@ export default function ProfitAndLoss() {
     return Array.from(set).sort().reverse();
   }, [sales, bills, expenses, daybookTransactions]);
 
-  const latestMonth = availableMonths[0] || '2026-09';
+  const latestMonth = availableMonths[0] || new Date().toISOString().slice(0, 7);
   const [datePeriod, setDatePeriod] = useState(() => `month_${latestMonth}`);
   const [dateFrom, setDateFrom] = useState(() => `${latestMonth}-01`);
   const [dateTo, setDateTo] = useState(() => {
@@ -80,7 +80,7 @@ export default function ProfitAndLoss() {
       setDateTo('');
       setSpecificDate('');
     } else if (period === 'specific') {
-      const initial = specificDate || dateFrom || '2026-09-01';
+      const initial = specificDate || dateFrom || toISO(today);
       setSpecificDate(initial);
       setDateFrom(initial);
       setDateTo(initial);
@@ -90,10 +90,6 @@ export default function ProfitAndLoss() {
       const lastDay = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate();
       setDateFrom(`${ym}-01`);
       setDateTo(`${ym}-${String(lastDay).padStart(2, '0')}`);
-      setSpecificDate('');
-    } else if (period === 'sept2026') {
-      setDateFrom('2026-09-01');
-      setDateTo('2026-09-30');
       setSpecificDate('');
     } else if (period === 'thisMonth') {
       const first = new Date(today.getFullYear(), today.getMonth(), 1);

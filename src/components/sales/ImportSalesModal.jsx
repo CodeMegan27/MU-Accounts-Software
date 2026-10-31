@@ -105,7 +105,7 @@ export function ImportSalesModal({ isOpen, onClose, onImportSuccess, showToast }
     setError('');
     try {
       setParsedOrders(septemberSalesFull);
-      setFile({ name: 'September_2026_Full_Sales_Register.xlsx', size: 180000 });
+      setFile({ name: 'Standard_Sales_Register_Sample.xlsx', size: 180000 });
     } catch (err) {
       setError('Failed to load full dataset: ' + err.message);
     } finally {

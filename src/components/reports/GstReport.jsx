@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
+import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '../../context/ToastContext';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
@@ -51,6 +52,7 @@ function getYearMonth(dateStr) {
 
 export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
   const { bills, sales, assets = [] } = useData();
+  const { profile = {} } = useSettings();
   const { showToast } = useToast();
 
   // Active sub-report: 'gstr1' | 'gstr2b' | 'gstr3b'
@@ -88,10 +90,17 @@ export default function GstReport({ initialReport = 'gstr1', onSwitchReport }) {
     return Array.from(set).sort().reverse();
   }, [bills, sales, assets]);
 
-  // Selected return period (defaults to 2026-09 if present, or first available)
+  // Selected return period (defaults to latest available period, or current month)
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    return '2026-09';
+    return new Date().toISOString().slice(0, 7);
   });
+
+  // Automatically select the latest available month when data loads
+  useEffect(() => {
+    if (availableMonths.length > 0 && (!selectedMonth || !availableMonths.includes(selectedMonth))) {
+      setSelectedMonth(availableMonths[0]);
+    }
+  }, [availableMonths]);
 
   // Additional Filters for GSTR-1
   const [gstr1SupplyType, setGstr1SupplyType] = useState('ALL'); // 'ALL' | 'B2B' | 'B2C'

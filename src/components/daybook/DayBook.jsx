@@ -38,6 +38,7 @@ export default function DayBook({ onViewSale }) {
     addDaybookTransaction, 
     updateDaybookTransaction, 
     deleteDaybookTransaction, 
+    deleteDaybookTransactions,
     resetDaybookToDefault,
     cleanNonRegisterDaybookEntries,
     isDaybookEntryAssociated,
@@ -51,9 +52,17 @@ export default function DayBook({ onViewSale }) {
 
   // Mode: 'daily' (one specific day) | 'range' | 'all'
   const [viewMode, setViewMode] = useState('daily');
-  const [selectedDate, setSelectedDate] = useState('2026-09-01');
-  const [dateFrom, setDateFrom] = useState('2026-09-01');
-  const [dateTo, setDateTo] = useState('2026-09-28');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().substring(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().substring(0, 10));
+
+  // Multi-Select Bulk Delete State
+  const [selectedEntryIds, setSelectedEntryIds] = useState(() => new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -99,7 +108,7 @@ export default function DayBook({ onViewSale }) {
   // Auto-sync selectedDate to availableDates if selectedDate is not in the list
   useEffect(() => {
     if (availableDates.length > 0 && !availableDates.includes(selectedDate)) {
-      setSelectedDate(availableDates[0]);
+      setSelectedDate(availableDates[availableDates.length - 1]);
     }
   }, [availableDates, selectedDate]);
 
@@ -528,8 +537,56 @@ export default function DayBook({ onViewSale }) {
   const handleConfirmDelete = () => {
     if (!deletingEntry) return;
     deleteDaybookTransaction(deletingEntry.id);
-    showToast('Day Book transaction removed', 'success');
+    setSelectedEntryIds(prev => {
+      const next = new Set(prev);
+      next.delete(deletingEntry.id);
+      return next;
+    });
+    showToast('Day Book transaction removed and synchronized', 'success');
     setDeletingEntry(null);
+  };
+
+  // Multi-Select Handlers
+  const handleToggleSelectEntry = (id) => {
+    setSelectedEntryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllCurrentPage = () => {
+    const pageIds = paginatedEntries.map(e => e.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedEntryIds.has(id));
+    setSelectedEntryIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        pageIds.forEach(id => next.delete(id));
+      } else {
+        pageIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllFiltered = () => {
+    const allIds = filteredEntries.map(e => e.id);
+    setSelectedEntryIds(new Set(allIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedEntryIds(new Set());
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedEntryIds.size === 0) return;
+    const count = selectedEntryIds.size;
+    const ids = Array.from(selectedEntryIds);
+    await deleteDaybookTransactions(ids);
+    setSelectedEntryIds(new Set());
+    setShowBulkDeleteConfirm(false);
+    showToast(`Successfully deleted ${count} selected Day Book transaction(s) and synchronized vouchers`, 'success');
   };
 
   // Wipe Demo Non-Register Entries
@@ -642,7 +699,7 @@ export default function DayBook({ onViewSale }) {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              All September (Full Ledger)
+              Full Ledger (All Dates)
             </button>
             <button
               onClick={() => { setViewMode('categorized'); setCurrentPage(1); }}
@@ -712,11 +769,11 @@ export default function DayBook({ onViewSale }) {
           )}
         </div>
 
-        {/* Quick Date Pills (1 to 28 Sep) */}
+        {/* Quick Date Pills */}
         {viewMode === 'daily' && (
           <div className="flex items-center gap-1 overflow-x-auto pb-1.5 pt-1 border-t border-slate-100 scrollbar-thin">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1.5 flex-shrink-0">
-              Sep Days:
+              Dates:
             </span>
             {availableDates.map(d => {
               const dayNum = d.split('-')[2];
@@ -1202,11 +1259,57 @@ export default function DayBook({ onViewSale }) {
           </div>
         </div>
 
+        {/* Multi-Select Bulk Actions Bar */}
+        {selectedEntryIds.size > 0 && (
+          <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-200 text-rose-800">
+                {selectedEntryIds.size} SELECTED
+              </span>
+              <span className="text-xs text-rose-900 font-bold">
+                {selectedEntryIds.size} Day Book transaction{selectedEntryIds.size > 1 ? 's' : ''} chosen
+              </span>
+              <button
+                type="button"
+                onClick={handleSelectAllFiltered}
+                className="text-xs font-semibold text-rose-700 underline hover:text-rose-900 cursor-pointer"
+              >
+                Select all {filteredEntries.length} filtered
+              </button>
+              <span className="text-slate-300">|</span>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+              >
+                Clear selection
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Selected ({selectedEntryIds.size})
+            </button>
+          </div>
+        )}
+
         {/* The Daybook Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
+                <th className="px-3 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={paginatedEntries.length > 0 && paginatedEntries.every(e => selectedEntryIds.has(e.id))}
+                    onChange={handleSelectAllCurrentPage}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                    title="Select all on this page"
+                  />
+                </th>
                 <th className="px-3.5 py-3 w-12 text-center">#</th>
                 <th className="px-3.5 py-3 w-24">Date</th>
                 <th className="px-3.5 py-3 w-28">EST / Bill No</th>
@@ -1224,7 +1327,7 @@ export default function DayBook({ onViewSale }) {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {paginatedEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="py-12 text-center text-slate-400">
+                  <td colSpan="13" className="py-12 text-center text-slate-400">
                     <p className="font-bold text-slate-600 text-sm">No Day Book entries found</p>
                     <p className="text-xs text-slate-400 mt-1">Try selecting another date or adjusting your filters</p>
                   </td>
@@ -1236,7 +1339,15 @@ export default function DayBook({ onViewSale }) {
                   const hasNote = Boolean(item.balanceNote);
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={item.id} className={`hover:bg-slate-50/80 transition-colors ${selectedEntryIds.has(item.id) ? 'bg-blue-50/40' : ''}`}>
+                      <td className="px-3 py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedEntryIds.has(item.id)}
+                          onChange={() => handleToggleSelectEntry(item.id)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                        />
+                      </td>
                       <td className="px-3.5 py-2.5 text-center font-mono text-[11px] text-slate-400">
                         {globalIdx}
                       </td>
@@ -1355,7 +1466,7 @@ export default function DayBook({ onViewSale }) {
             {filteredEntries.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-100 border-t-2 border-slate-300 font-black text-slate-900 text-xs">
-                  <td colSpan="7" className="px-4 py-3 text-right tracking-wider uppercase text-[11px] text-slate-600">
+                  <td colSpan="8" className="px-4 py-3 text-right tracking-wider uppercase text-[11px] text-slate-600">
                     Day Book Totals ({filteredEntries.length} Items):
                   </td>
                   <td className="px-3.5 py-3 text-right font-mono text-emerald-800 bg-emerald-100/60 whitespace-nowrap">
@@ -1615,6 +1726,40 @@ export default function DayBook({ onViewSale }) {
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs"
               >
                 Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-slate-900 text-base mb-2">
+              Bulk Delete {selectedEntryIds.size} Day Book Transaction{selectedEntryIds.size > 1 ? 's' : ''}?
+            </h4>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-slate-800">{selectedEntryIds.size}</strong> selected Day Book transaction(s)?
+              Any corresponding payments and vouchers in Payment & Receipt will also be automatically synchronized and removed. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-sm transition-colors cursor-pointer"
+              >
+                Yes, Delete {selectedEntryIds.size} Entries
               </button>
             </div>
           </div>

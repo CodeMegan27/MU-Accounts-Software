@@ -545,16 +545,6 @@ export function DataProvider({ children }) {
     });
   }, []);
 
-  const deleteDaybookTransaction = useCallback((id) => {
-    setDaybookTransactions(prev => {
-      const updated = prev.filter(item => item.id !== id);
-      try {
-        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updated));
-      } catch (err) {}
-      return updated;
-    });
-  }, []);
-
   const cleanNonRegisterDaybookEntries = useCallback(() => {
     let removedCount = 0;
     setDaybookTransactions(prev => {
@@ -1331,9 +1321,12 @@ export function DataProvider({ children }) {
     if (!bill) return;
 
     let history = Array.isArray(bill.paymentHistory) ? [...bill.paymentHistory] : [];
+    let removedPayment = null;
     if (typeof paymentIdOrIdx === 'number') {
+      removedPayment = history[paymentIdOrIdx];
       history.splice(paymentIdOrIdx, 1);
     } else {
+      removedPayment = history.find(p => p.id === paymentIdOrIdx);
       history = history.filter(p => p.id !== paymentIdOrIdx);
     }
 
@@ -1354,6 +1347,26 @@ export function DataProvider({ children }) {
     setBills(prev => prev.map(b => b.id === billId ? updated : b));
     localStorage.setItem('rspBills', JSON.stringify(bills.map(b => b.id === billId ? updated : b)));
     await persistDocument('bills', billId, updated);
+
+    // Synchronize 2-way removal from Daybook
+    const pAmt = parseFloat(removedPayment?.amount) || 0;
+    const pDate = removedPayment?.date;
+    const pId = removedPayment?.id;
+
+    setDaybookTransactions(prev => {
+      const updatedDb = prev.filter(item => {
+        const isThisBill = item.billId === billId || item.matchedBillId === billId || (typeof item.id === 'string' && item.id.includes(billId));
+        if (!isThisBill) return true;
+        if (pId && item.paymentId === pId) return false;
+        const itemAmt = (parseFloat(item.cashDebit) || 0) + (parseFloat(item.bankDebit) || 0);
+        if (pAmt > 0 && Math.abs(itemAmt - pAmt) < 0.01 && (!pDate || item.date === pDate)) return false;
+        return true;
+      });
+      try {
+        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updatedDb));
+      } catch (e) {}
+      return updatedDb;
+    });
 
     logActivity({
       action: 'DELETE',
@@ -1840,6 +1853,20 @@ export function DataProvider({ children }) {
       return updated;
     });
     await removeDocument('expenses', expenseId);
+
+    // Synchronize 2-way removal from Daybook
+    setDaybookTransactions(prev => {
+      const updatedDb = prev.filter(item => {
+        if (item.expenseId === expenseId || item.matchedExpenseId === expenseId) return false;
+        if (item.id === expenseId || item.id === `exp_${expenseId}`) return false;
+        if (exp && (item.id === exp.daybookRefId || item.daybookRefId === exp.id)) return false;
+        return true;
+      });
+      try {
+        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updatedDb));
+      } catch (e) {}
+      return updatedDb;
+    });
 
     if (exp) {
       logActivity({
@@ -2366,7 +2393,40 @@ export function DataProvider({ children }) {
       voucherNo: voucherData.voucherNo || `VOUCH-${Date.now().toString().slice(-5)}`,
       createdAt: new Date().toISOString()
     };
-    setCustomVouchers(prev => [newVoucher, ...prev]);
+    setCustomVouchers(prev => {
+      const updated = [newVoucher, ...prev];
+      try { localStorage.setItem('rsp_custom_vouchers', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    // Mirror to Day Book so it is immediately visible in Day Book and synchronizes across views
+    const isReceipt = newVoucher.type === 'RECEIPT';
+    const isCash = newVoucher.book === 'CASH' || (newVoucher.method && newVoucher.method.toUpperCase().includes('CASH'));
+    const amt = parseFloat(newVoucher.amount) || 0;
+
+    const dbItem = {
+      id: `db_vouch_${id}`,
+      customVoucherId: id,
+      date: newVoucher.date || new Date().toISOString().substring(0, 10),
+      estNo: newVoucher.voucherNo,
+      payment: newVoucher.method || (isCash ? 'CASH' : 'BANK TRANSFER'),
+      branch: newVoucher.branch || 'KLK',
+      department: newVoucher.department || 'GENERAL ADMIN',
+      category: isReceipt ? 'RECEIPT VOUCHER' : 'PAYMENT VOUCHER',
+      description: `${newVoucher.party || 'General'} - ${newVoucher.description || 'Manual Voucher'}`,
+      cashCredit: isReceipt && isCash ? amt : 0,
+      cashDebit: !isReceipt && isCash ? amt : 0,
+      bankCredit: isReceipt && !isCash ? amt : 0,
+      bankDebit: !isReceipt && !isCash ? amt : 0,
+      balanceNote: newVoucher.refNo || ''
+    };
+
+    setDaybookTransactions(prev => {
+      const updated = [dbItem, ...prev];
+      try { localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
     logActivity({
       action: 'CREATE',
       entityType: 'voucher',
@@ -2378,7 +2438,40 @@ export function DataProvider({ children }) {
   };
 
   const updateCustomVoucher = (id, updatedData) => {
-    setCustomVouchers(prev => prev.map(v => v.id === id ? { ...v, ...updatedData, updatedAt: new Date().toISOString() } : v));
+    setCustomVouchers(prev => {
+      const updated = prev.map(v => v.id === id ? { ...v, ...updatedData, updatedAt: new Date().toISOString() } : v);
+      try { localStorage.setItem('rsp_custom_vouchers', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    // Also update Daybook mirror
+    setDaybookTransactions(prev => {
+      const updated = prev.map(item => {
+        if (item.customVoucherId === id || item.id === `db_vouch_${id}` || item.id === id) {
+          const isReceipt = (updatedData.type || item.category?.includes('RECEIPT')) ? true : false;
+          const isCash = updatedData.book === 'CASH' || (updatedData.method && updatedData.method.toUpperCase().includes('CASH'));
+          const amt = parseFloat(updatedData.amount !== undefined ? updatedData.amount : (item.cashCredit + item.cashDebit + item.bankCredit + item.bankDebit)) || 0;
+          return {
+            ...item,
+            date: updatedData.date || item.date,
+            estNo: updatedData.voucherNo || item.estNo,
+            payment: updatedData.method || item.payment,
+            branch: updatedData.branch || item.branch,
+            department: updatedData.department || item.department,
+            description: updatedData.party ? `${updatedData.party} - ${updatedData.description || 'Voucher Entry'}` : item.description,
+            cashCredit: isReceipt && isCash ? amt : 0,
+            cashDebit: !isReceipt && isCash ? amt : 0,
+            bankCredit: isReceipt && !isCash ? amt : 0,
+            bankDebit: !isReceipt && !isCash ? amt : 0,
+            balanceNote: updatedData.refNo || item.balanceNote
+          };
+        }
+        return item;
+      });
+      try { localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
     logActivity({
       action: 'UPDATE',
       entityType: 'voucher',
@@ -2390,7 +2483,23 @@ export function DataProvider({ children }) {
 
   const deleteCustomVoucher = (id) => {
     const v = customVouchers.find(x => x.id === id);
-    setCustomVouchers(prev => prev.filter(x => x.id !== id));
+    setCustomVouchers(prev => {
+      const updated = prev.filter(x => x.id !== id);
+      try { localStorage.setItem('rsp_custom_vouchers', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    // Synchronize 2-way removal from Daybook
+    setDaybookTransactions(prev => {
+      const updatedDb = prev.filter(item => {
+        if (item.id === id || item.customVoucherId === id || item.id === `db_vouch_${id}`) return false;
+        if (v && v.voucherNo && item.estNo === v.voucherNo) return false;
+        return true;
+      });
+      try { localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updatedDb)); } catch (e) {}
+      return updatedDb;
+    });
+
     logActivity({
       action: 'DELETE',
       entityType: 'voucher',
@@ -2399,6 +2508,168 @@ export function DataProvider({ children }) {
       details: `Removed manual voucher entry`
     });
   };
+
+  // Synchronized 2-Way Deletion for Day Book & Voucher Registers (Single and Bulk)
+  const deleteDaybookTransactions = useCallback(async (ids) => {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    const idSet = new Set(ids);
+
+    // Find all items being removed
+    const itemsToDelete = daybookTransactions.filter(item => idSet.has(item.id));
+    if (itemsToDelete.length === 0) return;
+
+    // 1. Remove from daybookTransactions
+    setDaybookTransactions(prev => {
+      const updated = prev.filter(item => !idSet.has(item.id));
+      try {
+        localStorage.setItem('rsp_daybook_transactions', JSON.stringify(updated));
+      } catch (err) {}
+      return updated;
+    });
+
+    // 2. Cross-clear associated Custom Vouchers, Expenses, Bill Payments, and Sale Payments
+    const cvIdsToDelete = new Set();
+    const expIdsToDelete = new Set();
+    const billPaymentsToDelete = [];
+    const salePaymentsToDelete = [];
+
+    itemsToDelete.forEach(item => {
+      // Standalone Custom Vouchers
+      if (item.customVoucherId) cvIdsToDelete.add(item.customVoucherId);
+      if (customVouchers.some(cv => cv.id === item.id)) cvIdsToDelete.add(item.id);
+      if (item.estNo && customVouchers.some(cv => cv.voucherNo === item.estNo)) {
+        const cv = customVouchers.find(cv => cv.voucherNo === item.estNo);
+        if (cv) cvIdsToDelete.add(cv.id);
+      }
+
+      // Expenses
+      if (item.expenseId) expIdsToDelete.add(item.expenseId);
+      if (item.matchedExpenseId) expIdsToDelete.add(item.matchedExpenseId);
+      if (typeof item.id === 'string' && item.id.startsWith('exp_')) {
+        expIdsToDelete.add(item.id.replace('exp_', ''));
+      }
+      const matchedExp = expenses.find(e => e.daybookRefId === item.id || e.id === item.id);
+      if (matchedExp) expIdsToDelete.add(matchedExp.id);
+
+      // Bills
+      const bId = item.billId || item.matchedBillId || (typeof item.id === 'string' && item.id.startsWith('db_bill_pay_') ? item.id.split('_')[3] : null);
+      if (bId) {
+        const amt = (parseFloat(item.cashDebit) || 0) + (parseFloat(item.bankDebit) || 0);
+        billPaymentsToDelete.push({ billId: bId, paymentId: item.paymentId, amount: amt, date: item.date });
+      }
+
+      // Sales
+      const sId = item.saleId || item.matchedSaleId;
+      if (sId) {
+        const amt = (parseFloat(item.cashCredit) || 0) + (parseFloat(item.bankCredit) || 0);
+        salePaymentsToDelete.push({ saleId: sId, paymentId: item.paymentId, amount: amt, date: item.date });
+      }
+    });
+
+    // Clean Custom Vouchers
+    if (cvIdsToDelete.size > 0) {
+      setCustomVouchers(prev => {
+        const updated = prev.filter(cv => !cvIdsToDelete.has(cv.id));
+        try { localStorage.setItem('rsp_custom_vouchers', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+    }
+
+    // Clean Expenses
+    if (expIdsToDelete.size > 0) {
+      setExpenses(prev => {
+        const updated = prev.filter(e => !expIdsToDelete.has(e.id));
+        try { localStorage.setItem('rspExpenses', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      for (const eid of expIdsToDelete) {
+        try { await removeDocument('expenses', eid); } catch (e) {}
+      }
+    }
+
+    // Clean Bill Payments
+    if (billPaymentsToDelete.length > 0) {
+      setBills(prev => {
+        return prev.map(bill => {
+          const matchingOps = billPaymentsToDelete.filter(bp => bp.billId === bill.id);
+          if (matchingOps.length === 0) return bill;
+
+          let history = Array.isArray(bill.paymentHistory) ? [...bill.paymentHistory] : [];
+          matchingOps.forEach(op => {
+            if (op.paymentId) {
+              history = history.filter(p => p.id !== op.paymentId);
+            } else if (op.amount > 0) {
+              const idx = history.findIndex(p => Math.abs((parseFloat(p.amount) || 0) - op.amount) < 0.01 && (!op.date || p.date === op.date));
+              if (idx >= 0) history.splice(idx, 1);
+            }
+          });
+
+          const totalPaid = history.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+          const grandTotal = parseFloat(bill.grandTotal) || 0;
+          const balance = Math.max(0, grandTotal - totalPaid);
+          const paymentStatus = balance <= 0.01 ? 'paid' : (totalPaid > 0 ? 'partial' : 'unpaid');
+
+          const updatedBill = {
+            ...bill,
+            paymentHistory: history,
+            paidAmount: totalPaid,
+            balanceAmount: balance,
+            paymentStatus,
+            updatedAt: new Date().toISOString()
+          };
+          persistDocument('bills', bill.id, updatedBill).catch(() => {});
+          return updatedBill;
+        });
+      });
+    }
+
+    // Clean Sale Payments
+    if (salePaymentsToDelete.length > 0) {
+      setSales(prev => {
+        return prev.map(sale => {
+          const matchingOps = salePaymentsToDelete.filter(sp => sp.saleId === sale.id);
+          if (matchingOps.length === 0) return sale;
+
+          let payments = Array.isArray(sale.payments) ? [...sale.payments] : [];
+          matchingOps.forEach(op => {
+            if (op.paymentId) {
+              payments = payments.filter(p => p.id !== op.paymentId);
+            } else if (op.amount > 0) {
+              const idx = payments.findIndex(p => Math.abs((parseFloat(p.amount) || 0) - op.amount) < 0.01 && (!op.date || p.date === op.date));
+              if (idx >= 0) payments.splice(idx, 1);
+            }
+          });
+
+          const totalPaid = payments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+          const finalAmt = parseFloat(sale.finalAmount) || 0;
+          const balance = Math.max(0, finalAmt - totalPaid);
+          const paymentStatus = balance <= 0 ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+          return {
+            ...sale,
+            payments,
+            paidAmount: totalPaid,
+            balanceAmount: balance,
+            paymentStatus,
+            billStatus: balance <= 0 ? 'NIL' : 'PENDING',
+            updatedAt: new Date().toISOString()
+          };
+        });
+      });
+    }
+
+    logActivity({
+      action: 'DELETE',
+      entityType: 'daybook',
+      entityId: ids.join(','),
+      title: `Deleted ${ids.length} Day Book transaction(s)`,
+      details: `Synchronized removal across Day Book and Vouchers/Registers`
+    });
+  }, [daybookTransactions, customVouchers, expenses, bills, sales, persistDocument, removeDocument, logActivity]);
+
+  const deleteDaybookTransaction = useCallback((id) => {
+    return deleteDaybookTransactions([id]);
+  }, [deleteDaybookTransactions]);
 
   const convertToSalesInvoice = (id, customInvoiceNo, customInvDate) => {
     setSales(prev => {
@@ -2524,7 +2795,7 @@ export function DataProvider({ children }) {
       action: 'RESTORE_SALES',
       entityType: 'sale',
       entityId: `restore_default_${Date.now()}`,
-      title: 'Restored Default September 2026 Sales',
+      title: 'Restored Default Sales Dataset',
       details: `Restored ${septProcessed.length} original orders.`
     });
     return septProcessed.length;
@@ -2549,7 +2820,7 @@ export function DataProvider({ children }) {
       action: 'RESTORE_SALES',
       entityType: 'sale',
       entityId: `merge_${Date.now()}`,
-      title: 'Merged September 2026 Sales Records',
+      title: 'Merged Sample Sales Records',
       details: `Merged ${septProcessed.length} default records into current register.`
     });
     return septProcessed.length;
@@ -2688,6 +2959,7 @@ export function DataProvider({ children }) {
         addDaybookTransaction,
         updateDaybookTransaction,
         deleteDaybookTransaction,
+        deleteDaybookTransactions,
         resetDaybookToDefault,
         cleanNonRegisterDaybookEntries,
         isDaybookEntryAssociated,
